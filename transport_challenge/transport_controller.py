@@ -116,14 +116,7 @@ class Transport(Magnebot):
 
         # Use cached angles to reset an arm holding a container.
         if arm in self._container_arm_reset_angles:
-            self._start_action()
-            self._append_ik_commands(angles=self._container_arm_reset_angles[arm], arm=arm)
-            self._next_frame_commands.append({"$type": "set_prismatic_target",
-                                              "joint_id": self.magnebot_static.arm_joints[ArmJoint.torso],
-                                              "target": 1.2})
-            status = self._do_arm_motion()
-            self._end_action()
-            return status
+            return super().reset_arm(arm=arm, reset_torso=reset_torso)
 
         status = super().reset_arm(arm=arm, reset_torso=reset_torso)
         for object_id in self.state.held[arm]:
@@ -165,7 +158,7 @@ class Transport(Magnebot):
         state = SceneState(resp=self.communicate([]))
         # Move the target object to be over the container.
         target = state.object_transforms[container_id].position + (QuaternionUtils.UP * 0.3)
-        self._start_ik(target=TDWUtils.array_to_vector3(target), arm=Arm.left, absolute=False, allow_column=False)
+        self._start_ik(target=TDWUtils.array_to_vector3(target), arm=Arm.left, allow_column=False, state=state)
         self._do_arm_motion()
         # Drop the object.
         self._append_drop_commands(object_id=object_id, arm=object_arm)
@@ -320,3 +313,27 @@ class Transport(Magnebot):
                                                                                   object_id=object_id,
                                                                                   c=self))
         return object_id
+
+    def _get_reset_arm_commands(self, arm: Arm, reset_torso: bool) -> List[dict]:
+        if arm in self._container_arm_reset_angles:
+            self._append_ik_commands(angles=self._container_arm_reset_angles[arm], arm=arm)
+            return list()
+        else:
+            return super()._get_reset_arm_commands(arm=arm, reset_torso=reset_torso)
+
+    def _start_move_or_turn(self) -> None:
+        """
+        Start a move or turn action.
+        """
+
+        if len(self._container_arm_reset_angles) > 0:
+            # Move the torso up to its default height to prevent anything from dragging.
+            self._next_frame_commands.append({"$type": "set_prismatic_target",
+                                              "joint_id": self.magnebot_static.arm_joints[ArmJoint.torso],
+                                              "target": 1.2})
+        else:
+            # Move the torso up to its default height to prevent anything from dragging.
+            self._next_frame_commands.append({"$type": "set_prismatic_target",
+                                              "joint_id": self.magnebot_static.arm_joints[ArmJoint.torso],
+                                              "target": Magnebot._DEFAULT_TORSO_Y})
+        self._do_arm_motion()
