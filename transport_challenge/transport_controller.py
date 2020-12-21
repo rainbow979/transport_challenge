@@ -16,14 +16,48 @@ from transport_challenge.paths import TARGET_OBJECT_MATERIALS_PATH, TARGET_OBJEC
 
 class Transport(Magnebot):
     """
-    Transport challenge API. This extends the [Magnebot API](https://github.com/alters-mit/magnebot) to:
+    Transport challenge API.
 
-    - Procedurally add containers and target objects to the scene.
-    - Include higher-level actions to pick up objects and put them in containers.
+    **This extends the Magnebot API. Please read the [Magnebot API documentation](https://github.com/alters-mit/magnebot/blob/main/doc/magnebot_controller.md).**
 
-    _From the Magnebot API:_
+    The Magnebot API includes:
 
-    $MAGNEBOT_CLASS_DESC
+    - `init_scene()`
+    - `turn_by()`
+    - `turn_to()`
+    - `move_by()`
+    - `move_to()`
+    - `reach_for()`
+    - `grasp()`
+    - `drop()`
+    - `drop_all()`
+    - `reset_arm()`
+    - `rotate_camera()`
+    - `reset_camera()`
+    - `add_camera()`
+    - `get_occupancy_position()`
+    - `end()`
+
+    This API includes the following changes and additions:
+
+    - Procedurally add **containers** and **target objects** to the scene. Containers are boxes without lids that can hold objects; see the `containers` field. Target objects are small objects that are in navigable positions; see the `target_objects` field. Containers and target objects otherwise behave identically to any other object in terms of physics, segmentation colors, etc. and will appear in the output data alongside the other objects.
+    - Higher-level actions to pick up target objects and put them in containers.
+
+    ```python
+    from transport_challenge import Transport
+
+    m = Transport()
+    # Initializes the scene.
+    status = m.init_scene(scene="2a", layout=1)
+    print(status) # ActionStatus.success
+
+    # Prints the current position of the Magnebot.
+    print(m.state.magnebot_transform.position)
+
+    # Prints a list of all container IDs.
+    print(m.containers)
+    ```
+
     """
 
     """:class_var
@@ -97,13 +131,13 @@ class Transport(Magnebot):
 
     def reset_arm(self, arm: Arm, reset_torso: bool = True) -> ActionStatus:
         """
-        Reset an arm to its neutral position.
+        Reset an arm to its neutral position. Overrides `Magnebot.reset_arm()`.
 
         If the arm is holding a container, it will try to align the bottom of the container with the floor.
         This will be somewhat slow the first time the Magnebot does this for this held container.
         The Magnebot will also raise itself somewhat higher than it normally would to allow it to align the container.
 
-        Possible [return values](action_status.md):
+        Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
 
         - `success`
         - `failed_to_bend`
@@ -137,17 +171,47 @@ class Transport(Magnebot):
                 return status
         return status
 
-    def put_in(self, container_id: int, object_id: int) -> ActionStatus:
+    def put_in(self) -> ActionStatus:
+        """
+        Put an object in a container. In order to put an object in a container:
+
+        - The Magnebot must be holding a container with one magnet.
+        - The Magnebot must be holding a target object with another magnet.
+
+        This is a multistep action, combining many motions and may require more time than other actions.
+
+        Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
+
+        - `success`
+        - `not_holding` (If the Magnebot isn't holding a container or target object.)
+        - `failed_to_grasp` (If the target object didn't land in the container.)
+
+        :return: An `ActionStatus` indicating if the target object is in the container and if not, why.
+        """
+
         # Get the arm holding each object.
         container_arm: Optional[Arm] = None
-        object_arm: Optional[Arm] = None
+        container_id = -1
+        # Get an arm holding a container.
         for arm in self.state.held:
-            if container_id in self.state.held[arm]:
-                container_arm = arm
-            if object_id in self.state.held[arm]:
-                object_arm = arm
-        # Each object must be held in an arm, and the arms must be different.
-        if container_arm is None or object_arm is None or container_arm == object_arm:
+            for o_id in self.state.held[arm]:
+                if container_arm is None and o_id in self.containers:
+                    container_id = o_id
+                    container_arm = arm
+        if container_arm is None:
+            if self._debug:
+                print("Magnebot isn't holding a container.")
+            return ActionStatus.not_holding
+        # Check whether the opposite arm is holding a target object.
+        object_arm = Arm.left if container_arm == Arm.right else Arm.right
+        object_id = None
+        for o_id in self.state.held[object_arm]:
+            if o_id in self.target_objects:
+                object_id = o_id
+        if object_id is None:
+            if self._debug:
+                print(f"Magnebot is holding a container with the {container_arm.name} magnet but isn't holding a "
+                      f"target object with the {object_arm.name} magnet.")
             return ActionStatus.not_holding
 
         self._start_action()
@@ -197,7 +261,9 @@ class Transport(Magnebot):
         if object_id in overlap_ids:
             return ActionStatus.success
         else:
-            return ActionStatus.not_holding
+            if self._debug:
+                print(f"Object {object_id} isn't in container {container_id}")
+            return ActionStatus.failed_to_grasp
 
     def drop(self, target: int, arm: Arm) -> ActionStatus:
         status = super().drop(target=target, arm=arm)
