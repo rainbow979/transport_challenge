@@ -56,7 +56,8 @@ class Transport(Magnebot):
         for object_id in self.state.held[arm]:
             if object_id in self.containers:
                 # Orient
-                self._start_ik_orientation(orientation=[0, -1, 0], arm=arm, orientation_mode="Y", object_id=object_id)
+                self._start_ik_orientation(orientation=[0, 0, -1], arm=arm, orientation_mode="Y", object_id=object_id,
+                                           torso_prismatic=1.2)
                 status = self._do_arm_motion()
                 self._end_action()
                 return status
