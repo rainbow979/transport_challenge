@@ -1,0 +1,13 @@
+{
+  "Transport(Magnebot)":
+  {
+    "Arm Articulation": {
+      "description": "These functions move and bend the joints of the Magnebots's arms.",
+      "functions": ["reset_arm", "pick_up", "put_in"]
+    },
+    "Ignore": {
+      "description": "",
+      "functions": ["__init__", "drop", "drop_all", "get_scene_init_commands"]
+    }
+  }
+}
