@@ -5,16 +5,27 @@ from typing import List, Dict, Tuple
 import numpy as np
 from tdw.py_impact import ObjectInfo, AudioMaterial
 from tdw.librarian import ModelLibrarian
-from tdw.tdw_utils import TDWUtils
-from tdw.output_data import Bounds
+from tdw.tdw_utils import TDWUtils, QuaternionUtils
 from magnebot import Magnebot, Arm, ActionStatus
-from magnebot.scene_state import SceneState
 from magnebot.paths import ROOM_MAPS_DIRECTORY, OCCUPANCY_MAPS_DIRECTORY, SCENE_BOUNDS_PATH
 from transport_challenge.paths import TARGET_OBJECT_MATERIALS_PATH, TARGET_OBJECTS_PATH, CONTAINERS_PATH
-from magnebot.util import get_data
 
 
 class Transport(Magnebot):
+    """
+    Transport challenge API. This extends the [Magnebot API](https://github.com/alters-mit/magnebot) to:
+
+    - Procedurally add containers and target objects to the scene.
+    - Include higher-level actions to pick up objects and put them in containers.
+
+    _From the Magnebot API:_
+
+    $MAGNEBOT_CLASS_DESC
+    """
+
+    """:class_var
+    The mass of each target object.
+    """
     TARGET_OBJECT_MASS = 0.25
 
     # The scale factor of each container relative to its original size.
@@ -39,7 +50,26 @@ class Transport(Magnebot):
         """
         self.containers: List[int] = list()
 
+        # Cached IK solution for resetting an arm holding a container.
+        self._container_arm_angles: Dict[Arm, np.array] = dict()
+
     def pick_up(self, target: int, arm: Arm) -> ActionStatus:
+        """
+        Grasp an object and lift it up. This combines the actions `grasp()` and `reset_arm()`.
+
+        Possible [return values](action_status.md):
+
+        - `success`
+        - `cannot_reach`
+        - `failed_to_grasp`
+        - `failed_to_bend`
+
+        :param target: The ID of the target object.
+        :param arm: The arm of the magnet that will try to grasp the object.
+
+        :return: An `ActionStatus` indicating if the magnet at the end of the `arm` is holding the `target` and if not, why.
+        """
+
         if target in self.state.held[arm]:
             if self._debug:
                 print(f"Already holding {target}")
@@ -52,16 +82,59 @@ class Transport(Magnebot):
         return self.reset_arm(arm=arm, reset_torso=True)
 
     def reset_arm(self, arm: Arm, reset_torso: bool = True) -> ActionStatus:
+        """
+        Reset an arm to its neutral position.
+
+        If the arm is holding a container, it will try to align the bottom of the container with the floor.
+        This will be somewhat slow the first time the Magnebot does this for this held container.
+        The Magnebot will also raise itself somewhat higher than it normally would to allow it to align the container.
+
+        Possible [return values](action_status.md):
+
+        - `success`
+        - `failed_to_bend`
+
+        :param arm: The arm that will be reset.
+        :param reset_torso: If True, rotate and slide the torso to its neutral rotation and height.
+
+        :return: An `ActionStatus` indicating if the arm reset and if not, why.
+        """
+
+        # Use cached angles to reset an arm holding a container.
+        if arm in self._container_arm_angles:
+            self._append_ik_commands(angles=self._container_arm_angles, arm=arm)
+            status = self._do_arm_motion()
+            self._end_action()
+            return status
+
         status = super().reset_arm(arm=arm, reset_torso=reset_torso)
         for object_id in self.state.held[arm]:
             if object_id in self.containers:
-                # Orient
-                self._start_ik_orientation(orientation=[0, 0, -1], arm=arm, orientation_mode="Y", object_id=object_id,
-                                           torso_prismatic=1.2)
+                magnet_down = QuaternionUtils.get_up_direction(
+                    self.state.body_part_transforms[self.magnebot_static.magnets[arm]].rotation)
+                # Orient the container to be level with the floor.
+                self._start_ik_orientation(orientation=magnet_down, arm=arm, orientation_mode="Y",
+                                           object_id=object_id, torso_prismatic=1.2)
                 status = self._do_arm_motion()
                 self._end_action()
+
+                # Cache the arm angles so we can next time immediately reset to this position.
+                self._container_arm_angles[arm] = np.array([np.rad2deg(a) for a in self._get_initial_angles(arm=arm)])
+
                 return status
         return status
+
+    def drop(self, target: int, arm: Arm) -> ActionStatus:
+        status = super().drop(target=target, arm=arm)
+        if status == ActionStatus.success:
+            # Remove the cached container arm angles.
+            if arm in self._container_arm_angles:
+                del self._container_arm_angles[arm]
+        return status
+
+    def drop_all(self) -> ActionStatus:
+        self._container_arm_angles.clear()
+        return super().drop_all()
 
     def get_scene_init_commands(self, scene: str, layout: int, audio: bool) -> List[dict]:
         # Clear the list of target objects and containers.
