@@ -39,7 +39,8 @@ if __name__ == "__main__":
         # Pick up the target object.
         m.pick_up(target=object_id, arm=Arm.left)
         # Put the object in the container.
-        status = m.put_in(container_id=m.containers[0], object_id=object_id)
+        status = m.put_in()
         assert status == ActionStatus.success, status
         # Go to the next object.
         m.move_by(0.7)
+    m.end()
