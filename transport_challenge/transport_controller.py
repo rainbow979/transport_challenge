@@ -188,20 +188,13 @@ class Transport(Magnebot):
 
         - `success`
         - `not_holding` (If the Magnebot isn't holding a container or target object.)
-        - `failed_to_grasp` (If the target object didn't land in the container.)
+        - `not_in` (If the target object didn't land in the container.)
 
         :return: An `ActionStatus` indicating if the target object is in the container and if not, why.
         """
 
         # Get the arm holding each object.
-        container_arm: Optional[Arm] = None
-        container_id = -1
-        # Get an arm holding a container.
-        for arm in self.state.held:
-            for o_id in self.state.held[arm]:
-                if container_arm is None and o_id in self.containers:
-                    container_id = o_id
-                    container_arm = arm
+        container_arm, container_id = self._get_container_arm()
         if container_arm is None:
             if self._debug:
                 print("Magnebot isn't holding a container.")
@@ -233,44 +226,58 @@ class Transport(Magnebot):
         self._do_arm_motion()
         # Drop the object.
         self._append_drop_commands(object_id=object_id, arm=object_arm)
-        state_0 = SceneState(resp=self.communicate([]))
-        moving = True
-        # Set a maximum number of frames to prevent an infinite loop.
-        num_frames = 0
-        # Wait for the object to stop moving.
-        while moving and num_frames < 200:
-            moving = False
-            state_1 = SceneState(resp=self.communicate([]))
-            # Stop if the object somehow fell below the floor.
-            if state_1.object_transforms[object_id].position[1] < -1:
-                self._end_action()
-                return ActionStatus.not_holding
-            if np.linalg.norm(state_0.object_transforms[object_id].position -
-                              state_1.object_transforms[object_id].position) > 0.001:
-                moving = True
-            num_frames += 1
-            state_0 = state_1
+        # Wait for the object to fall (hopefully into the container).
+        self._wait_until_objects_stop(object_ids=[object_id])
 
         # Reset the arms.
         self.reset_arm(arm=object_arm, reset_torso=False)
         self.reset_arm(arm=container_arm, reset_torso=False)
 
-        # Check if the object is in the container.
-        resp = self.communicate({"$type": "send_overlap_box",
-                                 "position": TDWUtils.array_to_vector3(
-                                     self.state.object_transforms[container_id].position),
-                                 "rotation": TDWUtils.array_to_vector4(
-                                     self.state.object_transforms[container_id].rotation),
-                                 "half_extents": TDWUtils.array_to_vector3(self.objects_static[container_id].size)})
-        overlap = get_data(resp=resp, d_type=Overlap)
-        overlap_ids = [int(o_id) for o_id in overlap.get_object_ids() if int(o_id) != container_id]
+        in_container = self._get_objects_in_container(container_id=container_id)
         self._end_action()
-        if object_id in overlap_ids:
+        if object_id in in_container:
             return ActionStatus.success
         else:
             if self._debug:
                 print(f"Object {object_id} isn't in container {container_id}")
-            return ActionStatus.failed_to_grasp
+            return ActionStatus.not_in
+
+    def pour_out(self) -> ActionStatus:
+        """
+        Pour out all of the objects in a container held by one of the Magnebot's magnets.
+
+        Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
+
+        - `success`
+        - `not_holding` (If the Magnebot isn't holding a container.)
+        - `still_in` (If there are objects still in the container.)
+
+        :return: An `ActionStatus` indicating whether the container is now empty and if not, why.
+        """
+        container_arm, container_id = self._get_container_arm()
+        if container_arm is None:
+            if self._debug:
+                print("Magnebot isn't holding a container.")
+            return ActionStatus.not_holding
+        # Get all of the objects currently in the container.
+        in_container = self._get_objects_in_container(container_id=container_id)
+        self._start_action()
+        # Flip the container upside-down.
+        magnet_down = QuaternionUtils.get_up_direction(
+            self.state.body_part_transforms[self.magnebot_static.magnets[container_arm]].rotation)
+        # Orient the container to be level with the floor.
+        self._start_ik_orientation(orientation=-magnet_down, arm=container_arm, orientation_mode="Y",
+                                   fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER)
+        self._do_arm_motion()
+        # Wait for the objects to fall out (by this point, they likely already have).
+        self._wait_until_objects_stop(in_container)
+        self.reset_arm(arm=container_arm, reset_torso=False)
+        in_container = self._get_objects_in_container(container_id=container_id)
+        self._end_action()
+        if len(in_container) == 0:
+            return ActionStatus.success
+        else:
+            return ActionStatus.still_in
 
     def drop(self, target: int, arm: Arm) -> ActionStatus:
         status = super().drop(target=target, arm=arm)
@@ -410,3 +417,63 @@ class Transport(Magnebot):
                                               "joint_id": self.magnebot_static.arm_joints[ArmJoint.torso],
                                               "target": Magnebot._DEFAULT_TORSO_Y})
         self._do_arm_motion()
+
+    def _get_container_arm(self) -> Tuple[Arm, int]:
+        """
+        :return: Tuple: The arm holding a container, if any; the container ID.
+        """
+
+        container_arm: Optional[Arm] = None
+        container_id = -1
+        # Get an arm holding a container.
+        for arm in self.state.held:
+            for o_id in self.state.held[arm]:
+                if container_arm is None and o_id in self.containers:
+                    container_id = o_id
+                    container_arm = arm
+        return container_arm, container_id
+
+    def _get_objects_in_container(self, container_id: int) -> List[int]:
+        """
+        :param container_id: The ID of the container.
+
+        :return: A list of objects in the container.
+        """
+
+        # Check if the object is in the container.
+        resp = self.communicate({"$type": "send_overlap_box",
+                                 "position": TDWUtils.array_to_vector3(
+                                     self.state.object_transforms[container_id].position),
+                                 "rotation": TDWUtils.array_to_vector4(
+                                     self.state.object_transforms[container_id].rotation),
+                                 "half_extents": TDWUtils.array_to_vector3(self.objects_static[container_id].size)})
+        overlap = get_data(resp=resp, d_type=Overlap)
+        return [int(o_id) for o_id in overlap.get_object_ids() if int(o_id) != container_id]
+
+    def _wait_until_objects_stop(self, object_ids: List[int]) -> bool:
+        """
+        Wait until all objects in the list stop moving.
+
+        :param object_ids: A list of object IDs.
+
+        :return: True if the objects stopped moving after 200 frames and they're all above floor level.
+        """
+
+        state_0 = SceneState(resp=self.communicate([]))
+        moving = True
+        # Set a maximum number of frames to prevent an infinite loop.
+        num_frames = 0
+        # Wait for the object to stop moving.
+        while moving and num_frames < 200:
+            moving = False
+            state_1 = SceneState(resp=self.communicate([]))
+            for object_id in object_ids:
+                # Stop if the object somehow fell below the floor.
+                if state_1.object_transforms[object_id].position[1] < -1:
+                    return False
+                if np.linalg.norm(state_0.object_transforms[object_id].position -
+                                  state_1.object_transforms[object_id].position) > 0.001:
+                    moving = True
+                num_frames += 1
+                state_0 = state_1
+        return not moving

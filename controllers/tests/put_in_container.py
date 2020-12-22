@@ -3,7 +3,7 @@ from magnebot import Arm, ActionStatus
 from transport_challenge import Transport
 
 
-class PutInSeveral(Transport):
+class PutInContainer(Transport):
     """
     Test whether the Magnebot can pick up several objects.
     """
@@ -30,7 +30,7 @@ class PutInSeveral(Transport):
 
 
 if __name__ == "__main__":
-    m = PutInSeveral(launch_build=False, debug=True)
+    m = PutInContainer(launch_build=False, debug=True)
     m.init_scene()
     # Pick up the container.
     m.pick_up(target=m.containers[0], arm=Arm.right)
