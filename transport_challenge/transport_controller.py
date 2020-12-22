@@ -74,6 +74,9 @@ class Transport(Magnebot):
     # The model librarian.
     __LIBRARIAN = ModelLibrarian()
 
+    # The value of the torso prismatic joint while the Magnebot is holding a container.
+    __TORSO_PRISMATIC_CONTAINER = 1.2
+
     # Load a list of visual materials for target objects.
     __TARGET_OBJECT_MATERIALS = TARGET_OBJECT_MATERIALS_PATH.read_text(encoding="utf-8").split("\n")
 
@@ -160,7 +163,8 @@ class Transport(Magnebot):
                     self.state.body_part_transforms[self.magnebot_static.magnets[arm]].rotation)
                 # Orient the container to be level with the floor.
                 self._start_ik_orientation(orientation=magnet_down, arm=arm, orientation_mode="Y",
-                                           object_id=object_id, torso_prismatic=1.2)
+                                           object_id=object_id,
+                                           fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER)
                 status = self._do_arm_motion()
                 self._end_action()
 
@@ -218,16 +222,14 @@ class Transport(Magnebot):
         state = SceneState(resp=self.communicate([]))
         # Bring the container approximately to center.
         self._start_ik(target={"x": 0.1 * (1 if container_arm is Arm.right else -1), "y": 0.4, "z": 0.5},
-                       arm=container_arm, absolute=False, allow_column=False, state=state)
-        self._next_frame_commands.append({"$type": "set_prismatic_target",
-                                          "joint_id": self.magnebot_static.arm_joints[ArmJoint.torso],
-                                          "target": 1.2})
+                       arm=container_arm, absolute=False, allow_column=False, state=state,
+                       fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER)
         self._do_arm_motion()
         state = SceneState(resp=self.communicate([]))
         # Move the target object to be over the container.
         target = state.object_transforms[container_id].position + (QuaternionUtils.UP * 0.3)
         self._start_ik(target=TDWUtils.array_to_vector3(target), arm=Arm.left, allow_column=False, state=state,
-                       absolute=True)
+                       absolute=True, fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER)
         self._do_arm_motion()
         # Drop the object.
         self._append_drop_commands(object_id=object_id, arm=object_arm)
@@ -250,7 +252,7 @@ class Transport(Magnebot):
             state_0 = state_1
 
         # Reset the arms.
-        self.reset_arm(arm=object_arm)
+        self.reset_arm(arm=object_arm, reset_torso=False)
         self.reset_arm(arm=container_arm, reset_torso=False)
 
         # Check if the object is in the container.
@@ -401,7 +403,7 @@ class Transport(Magnebot):
             # Move the torso up to its default height to prevent anything from dragging.
             self._next_frame_commands.append({"$type": "set_prismatic_target",
                                               "joint_id": self.magnebot_static.arm_joints[ArmJoint.torso],
-                                              "target": 1.2})
+                                              "target": Transport.__TORSO_PRISMATIC_CONTAINER})
         else:
             # Move the torso up to its default height to prevent anything from dragging.
             self._next_frame_commands.append({"$type": "set_prismatic_target",
