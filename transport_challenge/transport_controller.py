@@ -1,4 +1,3 @@
-import random
 from json import loads
 from csv import DictReader
 from typing import List, Dict, Tuple, Optional
@@ -81,7 +80,8 @@ class Transport(Magnebot):
     __TARGET_OBJECT_MATERIALS = TARGET_OBJECT_MATERIALS_PATH.read_text(encoding="utf-8").split("\n")
 
     def __init__(self, port: int = 1071, launch_build: bool = True, screen_width: int = 256, screen_height: int = 256,
-                 debug: bool = False, auto_save_images: bool = False, images_directory: str = "images"):
+                 debug: bool = False, auto_save_images: bool = False, images_directory: str = "images",
+                 random_seed: int = 0):
         super().__init__(port=port, launch_build=launch_build, screen_width=screen_width, screen_height=screen_height,
                          debug=debug, auto_save_images=auto_save_images, images_directory=images_directory)
         """:field
@@ -92,6 +92,8 @@ class Transport(Magnebot):
         The IDs of each container in the scene.
         """
         self.containers: List[int] = list()
+
+        self._rng = np.random.RandomState(random_seed)
 
         # Cached IK solution for resetting an arm holding a container.
         self._container_arm_reset_angles: Dict[Arm, np.array] = dict()
@@ -311,33 +313,33 @@ class Transport(Magnebot):
             if self.occupancy_map[ix][iy] == 0:
                 rooms[room_index].append((ix, iy))
         # Choose a random room.
-        room_positions: List[Tuple[int, int]] = random.choice(list(rooms.values()))
+        room_positions: List[Tuple[int, int]] = self._rng.choice(list(rooms.values()))
 
         # Add target objects to the room.
-        for i in range(random.randint(8, 12)):
-            ix, iy = random.choice(room_positions)
+        for i in range(self._rng.randint(8, 12)):
+            ix, iy = self._rng.choice(room_positions)
             # Get the (x, z) coordinates for this position.
             # The y coordinate is in `ys_map`.
             x, z = self.get_occupancy_position(ix, iy)
-            self._add_target_object(model_name=random.choice(self._target_object_names),
+            self._add_target_object(model_name=self._rng.choice(self._target_object_names),
                                     position={"x": x, "y": 0, "z": z})
 
         # Add containers throughout the scene.
         containers = CONTAINERS_PATH.read_text(encoding="utf-8").split("\n")
         for room_index in list(rooms.keys()):
             # Maybe don't add a container in this room.
-            if random.random() < 0.25:
+            if self._rng.random() < 0.25:
                 continue
             # Get a random position in the room.
-            ix, iy = random.choice(rooms[room_index])
+            ix, iy = self._rng.choice(rooms[room_index])
 
             # Get the (x, z) coordinates for this position.
             # The y coordinate is in `ys_map`.
             x, z = self.get_occupancy_position(ix, iy)
-            container_name = random.choice(containers)
+            container_name = self._rng.choice(containers)
             self._add_container(model_name=container_name,
                                 position={"x": x, "y": 0, "z": z},
-                                rotation={"x": 0, "y": random.uniform(-179, 179), "z": 0})
+                                rotation={"x": 0, "y": self._rng.uniform(-179, 179), "z": 0})
         return commands
 
     def _add_container(self, model_name: str, position: Dict[str, float] = None,
@@ -380,13 +382,13 @@ class Transport(Magnebot):
         scale = self._target_objects[model_name]
         # Add the object.
         object_id = self._add_object(position=position,
-                                     rotation={"x": 0, "y": random.uniform(-179, 179), "z": 0},
+                                     rotation={"x": 0, "y": self._rng.uniform(-179, 179), "z": 0},
                                      scale={"x": scale, "y": scale, "z": scale},
                                      audio=audio,
                                      model_name=model_name)
         self.target_objects.append(object_id)
         # Set a random visual material for each target object.
-        visual_material = random.choice(Transport.__TARGET_OBJECT_MATERIALS)
+        visual_material = self._rng.choice(Transport.__TARGET_OBJECT_MATERIALS)
         substructure = Transport.__LIBRARIAN.get_record(model_name).substructure
         self._object_init_commands[object_id].extend(TDWUtils.set_visual_material(substructure=substructure,
                                                                                   material=visual_material,
