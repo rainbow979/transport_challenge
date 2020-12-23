@@ -161,12 +161,22 @@ class Transport(Magnebot):
         for object_id in self.state.held[arm]:
             if object_id in self.containers:
                 self._start_action()
-                magnet_down = QuaternionUtils.get_up_direction(
-                    self.state.body_part_transforms[self.magnebot_static.magnets[arm]].rotation)
                 # Orient the container to be level with the floor.
-                self._start_ik_orientation(orientation=magnet_down, arm=arm, orientation_mode="Y",
+                self._start_ik_orientation(orientation=-QuaternionUtils.FORWARD, arm=arm, orientation_mode="Y",
                                            object_id=object_id,
                                            fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER)
+                # Set the elbow to 90 degrees to prevent the container from scraping on the floor.
+                if arm == Arm.right:
+                    elbow_id = self.magnebot_static.arm_joints[ArmJoint.elbow_right]
+                else:
+                    elbow_id = self.magnebot_static.arm_joints[ArmJoint.elbow_left]
+                temp = list()
+                for cmd in self._next_frame_commands:
+                    if cmd["$type"] == "set_revolute_target" and cmd["joint_id"] == elbow_id:
+                        cmd["target"] = 90
+                    temp.append(cmd)
+                self._next_frame_commands = temp
+                # Bend the arm.
                 status = self._do_arm_motion()
                 self._end_action()
 
@@ -265,11 +275,25 @@ class Transport(Magnebot):
         in_container = self._get_objects_in_container(container_id=container_id)
         self._start_action()
         # Flip the container upside-down.
-        magnet_down = QuaternionUtils.get_up_direction(
-            self.state.body_part_transforms[self.magnebot_static.magnets[container_arm]].rotation)
-        # Orient the container to be level with the floor.
-        self._start_ik_orientation(orientation=-magnet_down, arm=container_arm, orientation_mode="Y",
-                                   fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER)
+        self._start_ik_orientation(orientation=-QuaternionUtils.FORWARD, arm=container_arm, orientation_mode="Z",
+                                   fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER,
+                                   object_id=container_id)
+
+        # Set the joints to high angles to really make sure that the container is flipped.
+        if container_arm == Arm.right:
+            elbow_id = self.magnebot_static.arm_joints[ArmJoint.elbow_right]
+            wrist_id = self.magnebot_static.arm_joints[ArmJoint.wrist_right]
+        else:
+            elbow_id = self.magnebot_static.arm_joints[ArmJoint.elbow_left]
+            wrist_id = self.magnebot_static.arm_joints[ArmJoint.wrist_left]
+        temp = list()
+        for cmd in self._next_frame_commands:
+            if cmd["$type"] == "set_revolute_target" and cmd["joint_id"] == elbow_id:
+                cmd["target"] = 145
+            elif cmd["$type"] == "set_spherical_target" and cmd["joint_id"] == wrist_id:
+                cmd["target"]["x"] = 90
+            temp.append(cmd)
+        self._next_frame_commands = temp
         self._do_arm_motion()
         # Wait for the objects to fall out (by this point, they likely already have).
         self._wait_until_objects_stop(in_container)

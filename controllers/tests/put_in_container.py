@@ -34,7 +34,6 @@ if __name__ == "__main__":
     m.init_scene()
     # Pick up the container.
     m.pick_up(target=m.containers[0], arm=Arm.right)
-
     for object_id in m.target_objects:
         # Pick up the target object.
         m.pick_up(target=object_id, arm=Arm.left)
@@ -43,4 +42,5 @@ if __name__ == "__main__":
         assert status == ActionStatus.success, status
         # Go to the next object.
         m.move_by(0.7)
+    m.pour_out()
     m.end()
