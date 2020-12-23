@@ -16,7 +16,6 @@ The Magnebot API includes:
 - `reach_for()`
 - `grasp()`
 - `drop()`
-- `drop_all()`
 - `reset_arm()`
 - `rotate_camera()`
 - `reset_camera()`
@@ -129,9 +128,23 @@ Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/ac
 
 - `success`
 - `not_holding` (If the Magnebot isn't holding a container or target object.)
-- `failed_to_grasp` (If the target object didn't land in the container.)
+- `not_in` (If the target object didn't land in the container.)
 
 _Returns:_  An `ActionStatus` indicating if the target object is in the container and if not, why.
+
+#### pour_out
+
+**`self.pour_out()`**
+
+Pour out all of the objects in a container held by one of the Magnebot's magnets.
+
+Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
+
+- `success`
+- `not_holding` (If the Magnebot isn't holding a container.)
+- `still_in` (If there are objects still in the container.)
+
+_Returns:_  An `ActionStatus` indicating whether the container is now empty and if not, why.
 
 ***
 

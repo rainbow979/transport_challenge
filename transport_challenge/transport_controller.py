@@ -29,7 +29,6 @@ class Transport(Magnebot):
     - `reach_for()`
     - `grasp()`
     - `drop()`
-    - `drop_all()`
     - `reset_arm()`
     - `rotate_camera()`
     - `reset_camera()`
@@ -239,7 +238,7 @@ class Transport(Magnebot):
         # Drop the object.
         self._append_drop_commands(object_id=object_id, arm=object_arm)
         # Wait for the object to fall (hopefully into the container).
-        self._wait_until_objects_stop(object_ids=[object_id])
+        self._wait_until_objects_stop(object_ids=[object_id], state=SceneState(self.communicate([])))
 
         # Reset the arms.
         self.reset_arm(arm=object_arm, reset_torso=False)
@@ -296,7 +295,7 @@ class Transport(Magnebot):
         self._next_frame_commands = temp
         self._do_arm_motion()
         # Wait for the objects to fall out (by this point, they likely already have).
-        self._wait_until_objects_stop(in_container)
+        self._wait_until_objects_stop(in_container, state=SceneState(self.communicate([])))
         self.reset_arm(arm=container_arm, reset_torso=False)
         in_container = self._get_objects_in_container(container_id=container_id)
         self._end_action()
@@ -305,17 +304,13 @@ class Transport(Magnebot):
         else:
             return ActionStatus.still_in
 
-    def drop(self, target: int, arm: Arm) -> ActionStatus:
-        status = super().drop(target=target, arm=arm)
+    def drop(self, target: int, arm: Arm, wait_for_objects: bool = True) -> ActionStatus:
+        status = super().drop(target=target, arm=arm, wait_for_objects=wait_for_objects)
         if status == ActionStatus.success:
             # Remove the cached container arm angles.
             if arm in self._container_arm_reset_angles:
                 del self._container_arm_reset_angles[arm]
         return status
-
-    def drop_all(self) -> ActionStatus:
-        self._container_arm_reset_angles.clear()
-        return super().drop_all()
 
     def get_scene_init_commands(self, scene: str, layout: int, audio: bool) -> List[dict]:
         # Clear the list of target objects and containers.
@@ -475,31 +470,3 @@ class Transport(Magnebot):
                                  "half_extents": TDWUtils.array_to_vector3(self.objects_static[container_id].size)})
         overlap = get_data(resp=resp, d_type=Overlap)
         return [int(o_id) for o_id in overlap.get_object_ids() if int(o_id) != container_id]
-
-    def _wait_until_objects_stop(self, object_ids: List[int]) -> bool:
-        """
-        Wait until all objects in the list stop moving.
-
-        :param object_ids: A list of object IDs.
-
-        :return: True if the objects stopped moving after 200 frames and they're all above floor level.
-        """
-
-        state_0 = SceneState(resp=self.communicate([]))
-        moving = True
-        # Set a maximum number of frames to prevent an infinite loop.
-        num_frames = 0
-        # Wait for the object to stop moving.
-        while moving and num_frames < 200:
-            moving = False
-            state_1 = SceneState(resp=self.communicate([]))
-            for object_id in object_ids:
-                # Stop if the object somehow fell below the floor.
-                if state_1.object_transforms[object_id].position[1] < -1:
-                    return False
-                if np.linalg.norm(state_0.object_transforms[object_id].position -
-                                  state_1.object_transforms[object_id].position) > 0.001:
-                    moving = True
-                num_frames += 1
-                state_0 = state_1
-        return not moving
