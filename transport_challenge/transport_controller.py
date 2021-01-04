@@ -80,7 +80,7 @@ class Transport(Magnebot):
 
     def __init__(self, port: int = 1071, launch_build: bool = True, screen_width: int = 256, screen_height: int = 256,
                  debug: bool = False, auto_save_images: bool = False, images_directory: str = "images",
-                 random_seed: int = 0):
+                 random_seed: int = None):
         super().__init__(port=port, launch_build=launch_build, screen_width=screen_width, screen_height=screen_height,
                          debug=debug, auto_save_images=auto_save_images, images_directory=images_directory)
         """:field
@@ -91,6 +91,10 @@ class Transport(Magnebot):
         The IDs of each container in the scene.
         """
         self.containers: List[int] = list()
+
+        # Get a random seed.
+        if random_seed is None:
+            random_seed = self.get_unique_id()
 
         self._rng = np.random.RandomState(random_seed)
 
@@ -158,25 +162,32 @@ class Transport(Magnebot):
 
         status = super().reset_arm(arm=arm, reset_torso=reset_torso)
         for object_id in self.state.held[arm]:
+            # If the arm is holding a container, orient the container to be level with the floor.
             if object_id in self.containers:
-                self._start_action()
-                # Orient the container to be level with the floor.
-                self._start_ik_orientation(orientation=-QuaternionUtils.FORWARD, arm=arm, orientation_mode="Y",
-                                           object_id=object_id,
-                                           fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER)
-                # Set the elbow to 90 degrees to prevent the container from scraping on the floor.
+                container_eulers = QuaternionUtils.quaternion_to_euler_angles(
+                    self.state.object_transforms[object_id].rotation)
+                # Get the commands to reset the arm.
+                self._next_frame_commands.extend(self._get_reset_arm_commands(arm=arm, reset_torso=reset_torso))
+
+                # Get the ID of the wrist.
                 if arm == Arm.right:
-                    elbow_id = self.magnebot_static.arm_joints[ArmJoint.elbow_right]
+                    wrist_id = self.magnebot_static.arm_joints[ArmJoint.wrist_right]
                 else:
-                    elbow_id = self.magnebot_static.arm_joints[ArmJoint.elbow_left]
+                    wrist_id = self.magnebot_static.arm_joints[ArmJoint.wrist_left]
+
                 temp = list()
                 for cmd in self._next_frame_commands:
-                    if cmd["$type"] == "set_revolute_target" and cmd["joint_id"] == elbow_id:
-                        cmd["target"] = 90
+                    # Adjust the wrist to level off the container.
+                    if cmd["$type"] == "set_spherical_target" and cmd["joint_id"] == wrist_id:
+                        cmd["target"] = {"x": float(container_eulers[0]),
+                                         "y": float(container_eulers[1]),
+                                         "z": float(container_eulers[2])}
+                        print(cmd["target"])
                     temp.append(cmd)
                 self._next_frame_commands = temp
+                self._start_action()
                 # Bend the arm.
-                status = self._do_arm_motion()
+                self._do_arm_motion()
                 self._end_action()
 
                 # Cache the arm angles so we can next time immediately reset to this position.
@@ -225,7 +236,7 @@ class Transport(Magnebot):
         self._start_action()
         state = SceneState(resp=self.communicate([]))
         # Bring the container approximately to center.
-        self._start_ik(target={"x": 0.1 * (1 if container_arm is Arm.right else -1), "y": 0.4, "z": 0.5},
+        self._start_ik(target={"x": 0.1 * (1 if container_arm is Arm.right else -1), "y": 0.5, "z": 0.5},
                        arm=container_arm, absolute=False, allow_column=False, state=state,
                        fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER)
         self._do_arm_motion()
@@ -233,7 +244,7 @@ class Transport(Magnebot):
         # Move the target object to be over the container.
         target = state.object_transforms[container_id].position + (QuaternionUtils.UP * 0.3)
         self._start_ik(target=TDWUtils.array_to_vector3(target), arm=Arm.left, allow_column=False, state=state,
-                       absolute=True, fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER)
+                       absolute=True, fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER, object_id=object_id)
         self._do_arm_motion()
         # Drop the object.
         self._append_drop_commands(object_id=object_id, arm=object_arm)

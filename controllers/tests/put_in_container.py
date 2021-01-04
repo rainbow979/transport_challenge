@@ -30,7 +30,7 @@ class PutInContainer(Transport):
 
 
 if __name__ == "__main__":
-    m = PutInContainer(launch_build=False, debug=True)
+    m = PutInContainer(launch_build=False, debug=True, random_seed=0)
     m.init_scene()
     # Pick up the container.
     m.pick_up(target=m.containers[0], arm=Arm.right)
