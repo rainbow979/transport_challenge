@@ -73,11 +73,11 @@ _These functions move and bend the joints of the Magnebots's arms._
 
 Grasp an object and lift it up. This combines the actions `grasp()` and `reset_arm()`.
 
-Possible [return values](action_status.md):
+Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
 
 - `success`
 - `cannot_reach`
-- `failed_to_grasp`
+- `failed_to_grasp` (Either because the motion failed or because the magnet is already holding an object.)
 - `failed_to_bend`
 
 

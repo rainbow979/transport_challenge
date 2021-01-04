@@ -18,7 +18,7 @@ class FillAndPour(Transport):
         d_theta = 360 / num_objects
         theta = d_theta / 2
         pos = np.array([2, 0, 0])
-        for i in range(num_objects):
+        for j in range(num_objects):
             object_position = TDWUtils.rotate_position_around(origin=origin, position=pos, angle=theta)
             self._add_target_object("jug05",
                                     position=TDWUtils.array_to_vector3(object_position))
@@ -33,19 +33,28 @@ class FillAndPour(Transport):
 
 
 if __name__ == "__main__":
-    m = FillAndPour(launch_build=False)
+    m = FillAndPour(launch_build=False, random_seed=0)
     m.init_scene()
     # Pick up the container.
     m.pick_up(target=m.containers[0], arm=Arm.right)
 
     i = 0
     for object_id in m.target_objects:
-        if i > 0 and i % 2 == 0:
-            m.pour_out()
+        # Every n objects, go to the center of the room and pour out the container.
+        if i > 0 and i % 4 == 0:
+            m.move_to({"x": 0, "y": 0, "z": 0})
+            s = m.pour_out()
+            assert s == ActionStatus.success, s
         m.move_to(target=object_id, arrived_at=1)
         # Pick up the target object.
-        m.pick_up(target=object_id, arm=Arm.left)
+        s = m.pick_up(target=object_id, arm=Arm.left)
+        assert s == ActionStatus.success, s
         # Put the object in the container.
-        status = m.put_in()
+        s = m.put_in()
+        assert s == ActionStatus.success, s
         i += 1
+    m.move_to({"x": 0, "y": 0, "z": 0})
+    s = m.pour_out()
+    assert s == ActionStatus.success, s
+    m.move_by(1)
     m.end()

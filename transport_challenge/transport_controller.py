@@ -113,11 +113,11 @@ class Transport(Magnebot):
         """
         Grasp an object and lift it up. This combines the actions `grasp()` and `reset_arm()`.
 
-        Possible [return values](action_status.md):
+        Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
 
         - `success`
         - `cannot_reach`
-        - `failed_to_grasp`
+        - `failed_to_grasp` (Either because the motion failed or because the magnet is already holding an object.)
         - `failed_to_bend`
 
         :param target: The ID of the target object.
@@ -130,6 +130,10 @@ class Transport(Magnebot):
             if self._debug:
                 print(f"Already holding {target}")
             return ActionStatus.success
+        if len(self.state.held[arm]) > 0:
+            if self._debug:
+                print(f"Already holding an object in {arm.name}")
+            return ActionStatus.failed_to_grasp
 
         status = self.grasp(target=target, arm=arm)
         if status != ActionStatus.success:
@@ -236,15 +240,15 @@ class Transport(Magnebot):
         self._start_action()
         state = SceneState(resp=self.communicate([]))
         # Bring the container approximately to center.
-        self._start_ik(target={"x": 0.1 * (1 if container_arm is Arm.right else -1), "y": 0.5, "z": 0.5},
+        self._start_ik(target={"x": 0.1 * (-1 if container_arm is Arm.right else 1), "y": 0.4, "z": 0.5},
                        arm=container_arm, absolute=False, allow_column=False, state=state,
                        fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER)
         self._do_arm_motion()
         state = SceneState(resp=self.communicate([]))
         # Move the target object to be over the container.
         target = state.object_transforms[container_id].position + (QuaternionUtils.UP * 0.3)
-        self._start_ik(target=TDWUtils.array_to_vector3(target), arm=Arm.left, allow_column=False, state=state,
-                       absolute=True, fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER, object_id=object_id)
+        self._start_ik(target=TDWUtils.array_to_vector3(target), arm=object_arm, allow_column=False, state=state,
+                       absolute=True, fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER)
         self._do_arm_motion()
         # Drop the object.
         self._append_drop_commands(object_id=object_id, arm=object_arm)
