@@ -94,6 +94,10 @@ class Demo(Transport):
         for object_id in object_ids:
             self.move_to(target=object_id, arrived_at=1)
             self.pick_up(target=object_id, arm=Arm.right)
+
+            # Move back just a bit so the arms have enough free space.
+            self.move_by(distance=-0.3, arrived_at=0.1)
+
             self.put_in()
 
         # Follow the path to the other room.
@@ -107,7 +111,7 @@ class Demo(Transport):
         Navigate back to the start position.
         """
 
-        path = np.flip(Demo.PATH[:-1])
+        path = np.flip(Demo.PATH[:-1], axis=0)
         for waypoint in path:
             self.move_to(target=TDWUtils.array_to_vector3(waypoint))
 
