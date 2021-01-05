@@ -5,6 +5,10 @@ from transport_challenge import Transport
 
 
 class FillAndPour(Transport):
+    """
+    Test whether the Magnebot can put objects in a container, move them around the scene, pour out the container.
+    """
+
     def init_scene(self, scene: str = None, layout: int = None, room: int = None) -> ActionStatus:
         origin = np.array([0, 0, 0])
         commands = [{"$type": "load_scene",
@@ -23,7 +27,7 @@ class FillAndPour(Transport):
             self._add_target_object("jug05",
                                     position=TDWUtils.array_to_vector3(object_position))
             theta += d_theta
-        commands.extend(self._get_scene_init_commands(magnebot_position={"x": 0, "y": 0, "z": 0}))
+        commands.extend(self._get_scene_init_commands())
         resp = self.communicate(commands)
         self._cache_static_data(resp=resp)
         # Wait for the Magnebot to reset to its neutral position.

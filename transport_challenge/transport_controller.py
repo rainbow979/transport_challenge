@@ -168,8 +168,13 @@ class Transport(Magnebot):
         for object_id in self.state.held[arm]:
             # If the arm is holding a container, orient the container to be level with the floor.
             if object_id in self.containers:
-                container_eulers = QuaternionUtils.quaternion_to_euler_angles(
-                    self.state.object_transforms[object_id].rotation)
+                rot = self.state.object_transforms[object_id].rotation
+                # Source: https://answers.unity.com/questions/416169/finding-pitchrollyaw-from-quaternions.html
+                x_rot = -np.rad2deg(np.arctan2(2 * rot[0] * rot[3] - 2 * rot[1] * rot[2],
+                                               1 - 2 * rot[0] * rot[0] - 2 * rot[2] * rot[2]))
+                if x_rot > 90:
+                    x_rot = x_rot - 180
+
                 # Get the commands to reset the arm.
                 self._next_frame_commands.extend(self._get_reset_arm_commands(arm=arm, reset_torso=reset_torso))
 
@@ -183,10 +188,7 @@ class Transport(Magnebot):
                 for cmd in self._next_frame_commands:
                     # Adjust the wrist to level off the container.
                     if cmd["$type"] == "set_spherical_target" and cmd["joint_id"] == wrist_id:
-                        cmd["target"] = {"x": float(container_eulers[0]),
-                                         "y": float(container_eulers[1]),
-                                         "z": float(container_eulers[2])}
-                        print(cmd["target"])
+                        cmd["target"] = {"x": x_rot, "y": 0, "z": 0}
                     temp.append(cmd)
                 self._next_frame_commands = temp
                 self._start_action()
@@ -347,13 +349,15 @@ class Transport(Magnebot):
             if self.occupancy_map[ix][iy] == 0:
                 rooms[room_index].append((ix, iy))
         # Choose a random room.
-        room_positions: List[Tuple[int, int]] = self._rng.choice(list(rooms.values()))
+        target_room_index = self._rng.choice(np.array(list(rooms.keys())))
+        target_room_positions: np.array = np.array(rooms[target_room_index])
+        used_target_object_positions: List[Tuple[int, int]] = list()
 
         # Add target objects to the room.
         for i in range(self._rng.randint(8, 12)):
-            ix, iy = self._rng.choice(room_positions)
+            ix, iy = target_room_positions[self._rng.randint(0, len(target_room_positions))]
+            used_target_object_positions.append((ix, iy))
             # Get the (x, z) coordinates for this position.
-            # The y coordinate is in `ys_map`.
             x, z = self.get_occupancy_position(ix, iy)
             self._add_target_object(model_name=self._rng.choice(self._target_object_names),
                                     position={"x": x, "y": 0, "z": z})
@@ -365,7 +369,16 @@ class Transport(Magnebot):
             if self._rng.random() < 0.25:
                 continue
             # Get a random position in the room.
-            ix, iy = self._rng.choice(rooms[room_index])
+            room_positions: np.array = np.array(rooms[room_index])
+            got_position = False
+            ix, iy = -1, -1
+            # Get a position where there isn't a target object.
+            while not got_position:
+                ix, iy = room_positions[self._rng.randint(0, len(room_positions))]
+                got_position = True
+                for utop in used_target_object_positions:
+                    if utop[0] == ix and utop[1] == iy:
+                        got_position = False
 
             # Get the (x, z) coordinates for this position.
             # The y coordinate is in `ys_map`.
@@ -427,7 +440,8 @@ class Transport(Magnebot):
         self._object_init_commands[object_id].extend(TDWUtils.set_visual_material(substructure=substructure,
                                                                                   material=visual_material,
                                                                                   object_id=object_id,
-                                                                                  c=self))
+                                                                                  c=self,
+                                                                                  quality="low"))
         return object_id
 
     def _get_reset_arm_commands(self, arm: Arm, reset_torso: bool) -> List[dict]:
