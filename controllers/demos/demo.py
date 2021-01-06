@@ -8,6 +8,19 @@ from transport_challenge import Transport
 
 
 class Demo(Transport):
+    """
+    A demo of a Magnebot using a container to transport target objects to a new room.
+
+    **This is NOT a use-case example.** It should only be used to generate a demo video of the Transport Challenge.
+
+    Key differences:
+
+    - Navigation is pre-calculated (see `PATH`).
+    - Only the `img` pass is captured (not `id` or `depth`).
+    - The screen is large, there is an overhead camera, and images are saved per-frame instead of per-action. This means that this controller will run *much* slower than a use-case controller.
+    - There are some low-level commands to optimize the demo such as teleporting a container and hiding the roof.
+    """
+
     # This is a pre-calculated path that the Magnebot will use to move between rooms.
     PATH: np.array = np.array([[6.396355, 0, -2.465405],
                                [5.41636, 0, -1.4854207],
@@ -25,6 +38,9 @@ class Demo(Transport):
         self._image_directories: Dict[str, Path] = dict()
         self._create_images_directory(avatar_id="a")
         self.image_pass_only = image_pass_only
+
+        # The first object is in a tight spot so the Magnebot will need to move a little more.
+        self.first_object_only = True
 
         self._image_count = 0
 
@@ -69,21 +85,6 @@ class Demo(Transport):
                 self._image_count += 1
         return resp
 
-    def get_nearest_container(self) -> int:
-        """
-        :return: The ID of the container closest to the avatar.
-        """
-
-        min_id = -1
-        min_distance = np.inf
-        for container_id in self.containers:
-            distance = np.linalg.norm(self.state.magnebot_transform.position -
-                                      self.state.object_transforms[container_id].position)
-            if distance < min_distance:
-                min_distance = distance
-                min_id = container_id
-        return min_id
-
     def transport(self, object_ids: List[int]) -> None:
         """
         Transport some objects to the other room.
@@ -96,7 +97,9 @@ class Demo(Transport):
             self.pick_up(target=object_id, arm=Arm.right)
 
             # Move back just a bit so the arms have enough free space.
-            self.move_by(distance=-0.3, arrived_at=0.1)
+            if self.first_object_only:
+                self.move_by(distance=-0.3, arrived_at=0.1)
+                self.first_object_only = False
 
             self.put_in()
 
@@ -114,6 +117,16 @@ class Demo(Transport):
         path = np.flip(Demo.PATH[:-1], axis=0)
         for waypoint in path:
             self.move_to(target=TDWUtils.array_to_vector3(waypoint))
+
+    def teleport_container(self) -> None:
+        """
+        Teleport a container into the same room as the Magnebot.
+        """
+
+        self._next_frame_commands.append({"$type": "teleport_object",
+                                          "id": self.containers[0],
+                                          "position": {"x": 7.44, "y": 0, "z": -2.62}})
+        self._end_action()
 
     def _get_scene_init_commands(self, magnebot_position: Dict[str, float] = None) -> List[dict]:
         commands = super()._get_scene_init_commands(magnebot_position=magnebot_position)
@@ -140,16 +153,16 @@ class Demo(Transport):
 
 
 if __name__ == "__main__":
-    # This random seed will spawn the Magnebot, the target objects, and a container all in the same room.
     m = Demo(launch_build=False, random_seed=9, images_directory="D:/transport_challenge_demo", image_pass_only=True)
     m.init_scene(scene="2a", layout=1, room=4)
     # Add an overhead camera.
     m.add_camera(position={"x": -3.6, "y": 8, "z": -0.67}, look_at=True, follow=True)
 
-    # Pick up the nearest container.
-    nearest_container = m.get_nearest_container()
-    m.move_to(target=nearest_container, arrived_at=1)
-    m.pick_up(nearest_container, arm=Arm.left)
+    m.teleport_container()
+
+    # Pick up the  container.
+    m.move_to(target=m.containers[0], arrived_at=1)
+    m.pick_up(target=m.containers[0], arm=Arm.left)
 
     # Pick up some objects and put them in another room.
     m.transport(m.target_objects[:4])
@@ -158,7 +171,7 @@ if __name__ == "__main__":
     m.go_to_start()
 
     # Pick up some more objects and put them in the other room.
-    m.transport(m.target_objects[5:])
+    m.transport(m.target_objects[4:])
 
     m.move_by(-1)
     m.end()

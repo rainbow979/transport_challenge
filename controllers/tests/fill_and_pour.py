@@ -51,8 +51,7 @@ if __name__ == "__main__":
             assert s == ActionStatus.success, s
         m.move_to(target=object_id, arrived_at=1)
         # Pick up the target object.
-        s = m.pick_up(target=object_id, arm=Arm.left)
-        assert s == ActionStatus.success, s
+        m.pick_up(target=object_id, arm=Arm.left)
         # Put the object in the container.
         s = m.put_in()
         assert s == ActionStatus.success, s

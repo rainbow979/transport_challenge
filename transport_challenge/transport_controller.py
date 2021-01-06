@@ -174,6 +174,8 @@ class Transport(Magnebot):
                                                1 - 2 * rot[0] * rot[0] - 2 * rot[2] * rot[2]))
                 if x_rot > 90:
                     x_rot = x_rot - 180
+                elif x_rot > 0:
+                    x_rot = -x_rot
 
                 # Get the commands to reset the arm.
                 self._next_frame_commands.extend(self._get_reset_arm_commands(arm=arm, reset_torso=reset_torso))
@@ -450,23 +452,6 @@ class Transport(Magnebot):
             return list()
         else:
             return super()._get_reset_arm_commands(arm=arm, reset_torso=reset_torso)
-
-    def _start_move_or_turn(self) -> None:
-        """
-        Start a move or turn action.
-        """
-
-        if len(self._container_arm_reset_angles) > 0:
-            # Move the torso up to its default height to prevent anything from dragging.
-            self._next_frame_commands.append({"$type": "set_prismatic_target",
-                                              "joint_id": self.magnebot_static.arm_joints[ArmJoint.torso],
-                                              "target": Transport.__TORSO_PRISMATIC_CONTAINER})
-        else:
-            # Move the torso up to its default height to prevent anything from dragging.
-            self._next_frame_commands.append({"$type": "set_prismatic_target",
-                                              "joint_id": self.magnebot_static.arm_joints[ArmJoint.torso],
-                                              "target": Magnebot._DEFAULT_TORSO_Y})
-        self._do_arm_motion()
 
     def _get_container_arm(self) -> Tuple[Arm, int]:
         """
