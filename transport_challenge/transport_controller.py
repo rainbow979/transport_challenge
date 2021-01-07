@@ -244,15 +244,16 @@ class Transport(Magnebot):
         self._start_action()
         state = SceneState(resp=self.communicate([]))
         # Bring the container approximately to center.
-        self._start_ik(target={"x": 0.1 * (-1 if container_arm is Arm.right else 1), "y": 0.4, "z": 0.5},
+        ct = {"x": 0.1 * (-1 if container_arm is Arm.right else 1), "y": 0.4, "z": 0.5}
+        self._start_ik(target=ct,
                        arm=container_arm, absolute=False, allow_column=False, state=state,
-                       fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER)
+                       fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER, do_prismatic_first=False)
         self._do_arm_motion()
         state = SceneState(resp=self.communicate([]))
         # Move the target object to be over the container.
         target = state.object_transforms[container_id].position + (QuaternionUtils.UP * 0.3)
         self._start_ik(target=TDWUtils.array_to_vector3(target), arm=object_arm, allow_column=False, state=state,
-                       absolute=True, fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER)
+                       absolute=True, fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER, object_id=object_id)
         self._do_arm_motion()
         # Drop the object.
         self._append_drop_commands(object_id=object_id, arm=object_arm)
@@ -260,8 +261,9 @@ class Transport(Magnebot):
         self._wait_until_objects_stop(object_ids=[object_id], state=SceneState(self.communicate([])))
 
         # Reset the arms.
-        self.reset_arm(arm=object_arm, reset_torso=False)
-        self.reset_arm(arm=container_arm, reset_torso=False)
+        self._next_frame_commands.extend(self._get_reset_arm_commands(arm=container_arm, reset_torso=False))
+        self._next_frame_commands.extend(self._get_reset_arm_commands(arm=object_arm, reset_torso=True))
+        self._do_arm_motion()
 
         in_container = self._get_objects_in_container(container_id=container_id)
         self._end_action()
@@ -485,12 +487,14 @@ class Transport(Magnebot):
         :return: A list of objects in the container.
         """
 
+        state = SceneState(self.communicate([]))
+
         # Check if the object is in the container.
         resp = self.communicate({"$type": "send_overlap_box",
                                  "position": TDWUtils.array_to_vector3(
-                                     self.state.object_transforms[container_id].position),
+                                     state.object_transforms[container_id].position),
                                  "rotation": TDWUtils.array_to_vector4(
-                                     self.state.object_transforms[container_id].rotation),
+                                     state.object_transforms[container_id].rotation),
                                  "half_extents": TDWUtils.array_to_vector3(self.objects_static[container_id].size / 2)})
         overlap = get_data(resp=resp, d_type=Overlap)
         return [int(o_id) for o_id in overlap.get_object_ids() if int(o_id) != container_id]
