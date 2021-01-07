@@ -49,7 +49,7 @@ if __name__ == "__main__":
             m.move_to({"x": 0, "y": 0, "z": 0})
             s = m.pour_out()
             assert s == ActionStatus.success, s
-        m.move_to(target=object_id, arrived_at=1)
+        m.move_to(target=object_id)
         # Pick up the target object.
         m.pick_up(target=object_id, arm=Arm.left)
         # Put the object in the container.

@@ -276,6 +276,10 @@ class Transport(Magnebot):
         """
         Pour out all of the objects in a container held by one of the Magnebot's magnets.
 
+        The Magnebot will extend the arm holding the container and then flip its elbow and wrist.
+
+        The action ends when any objects that were in the container stop moving.
+
         Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
 
         - `success`
@@ -292,26 +296,32 @@ class Transport(Magnebot):
         # Get all of the objects currently in the container.
         in_container = self._get_objects_in_container(container_id=container_id)
         self._start_action()
-        # Flip the container upside-down.
-        self._start_ik_orientation(orientation=-QuaternionUtils.FORWARD, arm=container_arm, orientation_mode="Z",
-                                   fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER,
-                                   object_id=container_id)
 
-        # Set the joints to high angles to really make sure that the container is flipped.
+        # Get the joint IDs.
         if container_arm == Arm.right:
+            shoulder_id = self.magnebot_static.arm_joints[ArmJoint.shoulder_right]
             elbow_id = self.magnebot_static.arm_joints[ArmJoint.elbow_right]
             wrist_id = self.magnebot_static.arm_joints[ArmJoint.wrist_right]
         else:
+            shoulder_id = self.magnebot_static.arm_joints[ArmJoint.shoulder_left]
             elbow_id = self.magnebot_static.arm_joints[ArmJoint.elbow_left]
             wrist_id = self.magnebot_static.arm_joints[ArmJoint.wrist_left]
-        temp = list()
-        for cmd in self._next_frame_commands:
-            if cmd["$type"] == "set_revolute_target" and cmd["joint_id"] == elbow_id:
-                cmd["target"] = 145
-            elif cmd["$type"] == "set_spherical_target" and cmd["joint_id"] == wrist_id:
-                cmd["target"]["x"] = 90
-            temp.append(cmd)
-        self._next_frame_commands = temp
+
+        # Extend the arm.
+        self._next_frame_commands.extend([{"$type": "set_spherical_target",
+                                           "joint_id": shoulder_id,
+                                           "target": {"x": 90 * (1 if container_arm == Arm.left else -1), "y": 0, "z": 0}},
+                                          {"$type": "set_revolute_target",
+                                           "joint_id": elbow_id,
+                                           "target": 0}])
+        self._do_arm_motion()
+        # Flip the wrist.
+        self._next_frame_commands.extend([{"$type": "set_spherical_target",
+                                           "joint_id": wrist_id,
+                                           "target": {"x": 90, "y": 0, "z": 0}},
+                                          {"$type": "set_revolute_target",
+                                           "joint_id": elbow_id,
+                                           "target": 35}])
         self._do_arm_motion()
         # Wait for the objects to fall out (by this point, they likely already have).
         self._wait_until_objects_stop(in_container, state=SceneState(self.communicate([])))
@@ -481,6 +491,6 @@ class Transport(Magnebot):
                                      self.state.object_transforms[container_id].position),
                                  "rotation": TDWUtils.array_to_vector4(
                                      self.state.object_transforms[container_id].rotation),
-                                 "half_extents": TDWUtils.array_to_vector3(self.objects_static[container_id].size)})
+                                 "half_extents": TDWUtils.array_to_vector3(self.objects_static[container_id].size / 2)})
         overlap = get_data(resp=resp, d_type=Overlap)
         return [int(o_id) for o_id in overlap.get_object_ids() if int(o_id) != container_id]

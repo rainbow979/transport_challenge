@@ -138,6 +138,10 @@ _Returns:_  An `ActionStatus` indicating if the target object is in the containe
 
 Pour out all of the objects in a container held by one of the Magnebot's magnets.
 
+The Magnebot will extend the arm holding the container and then flip its elbow and wrist.
+
+The action ends when any objects that were in the container stop moving.
+
 Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
 
 - `success`
