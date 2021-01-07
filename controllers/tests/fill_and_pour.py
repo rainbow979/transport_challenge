@@ -59,5 +59,5 @@ if __name__ == "__main__":
     m.move_to({"x": 0, "y": 0, "z": 0})
     s = m.pour_out()
     assert s == ActionStatus.success, s
-    m.move_by(1)
+    m.move_by(-1)
     m.end()

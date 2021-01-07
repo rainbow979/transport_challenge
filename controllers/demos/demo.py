@@ -1,6 +1,8 @@
-import numpy as np
+from os import chdir
 from typing import Dict, List, Union
 from pathlib import Path
+from subprocess import call
+import numpy as np
 from tdw.tdw_utils import TDWUtils
 from tdw.output_data import OutputData, Images
 from magnebot import ActionStatus, Arm
@@ -29,20 +31,25 @@ class Demo(Transport):
                                [0.4, 0, 0.66],
                                [0.02635, 0, -1.975]])
 
-    def __init__(self, port: int = 1071, launch_build: bool = True, screen_width: int = 1024, screen_height: int = 1024,
-                 images_directory: str = "images", image_pass_only: bool = False, random_seed: int = None):
-        super().__init__(port=port, launch_build=launch_build, screen_width=screen_width, screen_height=screen_height,
-                         auto_save_images=False, debug=False, images_directory=images_directory,
-                         random_seed=random_seed)
+    def __init__(self, port: int = 1071, screen_width: int = 1024, screen_height: int = 1024,
+                 images_directory: str = "images", image_pass_only: bool = False, overhead_camera_only: bool = False):
+        super().__init__(port=port, launch_build=False, screen_width=screen_width, screen_height=screen_height,
+                         auto_save_images=False, debug=False, images_directory=images_directory, random_seed=9)
 
-        self._image_directories: Dict[str, Path] = dict()
-        self._create_images_directory(avatar_id="a")
+        self.image_directories: Dict[str, Path] = dict()
         self.image_pass_only = image_pass_only
-
-        # The first object is in a tight spot so the Magnebot will need to move a little more.
-        self.first_object_only = True
+        self.overhead_camera_only = overhead_camera_only
+        if not overhead_camera_only:
+            self._create_images_directory(avatar_id="a")
 
         self._image_count = 0
+        self._to_transport: List[int] = list()
+
+    def init_scene(self, scene: str, layout: int, room: int = None) -> ActionStatus:
+        status = super().init_scene(scene=scene, layout=layout, room=room)
+
+        self._to_transport = self.target_objects[:]
+        return status
 
     def add_camera(self, position: Dict[str, float], roll: float = 0, pitch: float = 0, yaw: float = 0,
                    look_at: bool = True, follow: bool = False, camera_id: str = "c") -> ActionStatus:
@@ -57,9 +64,15 @@ class Demo(Transport):
                                     camera_id=camera_id)
         # Always save images.
         if not self._debug:
-            self._per_frame_commands.extend([{"$type": "enable_image_sensor",
-                                              "enable": True},
-                                             {"$type": "send_images"}])
+            if self.overhead_camera_only:
+                self._per_frame_commands.extend([{"$type": "enable_image_sensor",
+                                                  "enable": True},
+                                                 {"$type": "send_images",
+                                                  "ids": ["c"]}])
+            else:
+                self._per_frame_commands.extend([{"$type": "enable_image_sensor",
+                                                  "enable": True},
+                                                 {"$type": "send_images"}])
         return status
 
     def communicate(self, commands: Union[dict, List[dict]]) -> List[bytes]:
@@ -78,30 +91,36 @@ class Demo(Transport):
                 if r_id == "imag":
                     got_images = True
                     images = Images(resp[i])
-                    TDWUtils.save_images(filename=TDWUtils.zero_padding(self._image_count, 8),
-                                         output_directory=self._image_directories[images.get_avatar_id()],
-                                         images=images)
+                    avatar_id = images.get_avatar_id()
+                    if avatar_id in self.image_directories:
+                        TDWUtils.save_images(filename=TDWUtils.zero_padding(self._image_count, 8),
+                                             output_directory=self.image_directories[avatar_id],
+                                             images=images)
             if got_images:
                 self._image_count += 1
         return resp
 
-    def transport(self, object_ids: List[int]) -> None:
+    def transport(self) -> None:
         """
         Transport some objects to the other room.
-
-        :param object_ids: The list of target object IDs.
         """
-        # Pick up some objects.
-        for object_id in object_ids:
-            self.move_to(target=object_id, arrived_at=1)
+
+        for i in range(4):
+            # Get the closest object that still needs to be transported.
+            self._to_transport = list(sorted(self._to_transport, key=lambda x: np.linalg.norm(
+                self.state.object_transforms[x].position - self.state.magnebot_transform.position)))
+            object_id = self._to_transport[0]
+            # Go to the object and pick it up.
+            self.move_to(target=object_id)
             self.pick_up(target=object_id, arm=Arm.right)
 
             # Move back just a bit so the arms have enough free space.
-            if self.first_object_only:
+            if len(self._to_transport) == len(self.target_objects):
                 self.move_by(distance=-0.3, arrived_at=0.1)
-                self.first_object_only = False
-
+            # Put the object in the container.
             self.put_in()
+            # Record this object as done.
+            self._to_transport = self._to_transport[1:]
 
         # Follow the path to the other room.
         path = Demo.PATH[1:]
@@ -149,11 +168,11 @@ class Demo(Transport):
         a_dir = self.images_directory.joinpath(avatar_id)
         if not a_dir.exists():
             a_dir.mkdir(parents=True)
-        self._image_directories[avatar_id] = a_dir
+        self.image_directories[avatar_id] = a_dir
 
 
 if __name__ == "__main__":
-    m = Demo(launch_build=False, random_seed=9, images_directory="D:/transport_challenge_demo", image_pass_only=True)
+    m = Demo(images_directory="D:/transport_challenge_demo", image_pass_only=True, overhead_camera_only=True)
     m.init_scene(scene="2a", layout=1, room=4)
     # Add an overhead camera.
     m.add_camera(position={"x": -3.6, "y": 8, "z": -0.67}, look_at=True, follow=True)
@@ -161,17 +180,24 @@ if __name__ == "__main__":
     m.teleport_container()
 
     # Pick up the  container.
-    m.move_to(target=m.containers[0], arrived_at=1)
+    m.move_to(target=m.containers[0])
     m.pick_up(target=m.containers[0], arm=Arm.left)
 
     # Pick up some objects and put them in another room.
-    m.transport(m.target_objects[:4])
-
+    m.transport()
     # Go back to the starting room.
     m.go_to_start()
-
     # Pick up some more objects and put them in the other room.
-    m.transport(m.target_objects[4:])
-
+    m.transport()
     m.move_by(-1)
     m.end()
+
+    # Create a video.
+    if m.overhead_camera_only:
+        chdir(str(m.image_directories["c"]))
+        call(["ffmpeg.exe",
+              "-r", 90,
+              "-i", "img_%08d.jpg",
+              "-vcodec", "libx264",
+              "-pix_fmt", "yuv420p",
+              str(m.images_directory.joinpath("transport_challenge_demo.mp4").resolve())])

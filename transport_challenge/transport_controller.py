@@ -242,6 +242,15 @@ class Transport(Magnebot):
             return ActionStatus.not_holding
 
         self._start_action()
+        # Move the other arm out of the way.
+        if container_arm == Arm.right:
+            elbow_id = self.magnebot_static.arm_joints[ArmJoint.elbow_left]
+        else:
+            elbow_id = self.magnebot_static.arm_joints[ArmJoint.elbow_right]
+        self._next_frame_commands.append({"$type": "set_revolute_target",
+                                          "joint_id": elbow_id,
+                                          "target": 115})
+        self._do_arm_motion()
         state = SceneState(resp=self.communicate([]))
         # Bring the container approximately to center.
         ct = {"x": 0.1 * (-1 if container_arm is Arm.right else 1), "y": 0.4, "z": 0.5}
@@ -312,7 +321,7 @@ class Transport(Magnebot):
         # Extend the arm.
         self._next_frame_commands.extend([{"$type": "set_spherical_target",
                                            "joint_id": shoulder_id,
-                                           "target": {"x": 90 * (1 if container_arm == Arm.left else -1), "y": 0, "z": 0}},
+                                           "target": {"x": -90, "y": 0, "z": 0}},
                                           {"$type": "set_revolute_target",
                                            "joint_id": elbow_id,
                                            "target": 0}])
