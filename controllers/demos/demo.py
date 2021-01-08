@@ -113,10 +113,6 @@ class Demo(Transport):
             # Go to the object and pick it up.
             self.move_to(target=object_id)
             self.pick_up(target=object_id, arm=Arm.right)
-
-            # Move back just a bit so the arms have enough free space.
-            if len(self._to_transport) == len(self.target_objects):
-                self.move_by(distance=-0.3, arrived_at=0.1)
             # Put the object in the container.
             self.put_in()
             # Record this object as done.
@@ -187,16 +183,13 @@ if __name__ == "__main__":
     m.transport()
     # Go back to the starting room.
     m.go_to_start()
-    # Pick up some more objects and put them in the other room.
-    m.transport()
-    m.move_by(-1)
     m.end()
 
     # Create a video.
     if m.overhead_camera_only:
         chdir(str(m.image_directories["c"]))
         call(["ffmpeg.exe",
-              "-r", 90,
+              "-r", "90",
               "-i", "img_%08d.jpg",
               "-vcodec", "libx264",
               "-pix_fmt", "yuv420p",
