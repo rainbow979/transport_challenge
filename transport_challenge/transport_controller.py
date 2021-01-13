@@ -47,7 +47,7 @@ class Transport(Magnebot):
     | `turn_to()` | 1 |
     | `move_by()` | 1 |
     | `move_to()` | 2 |
-    | `teleport()` | 1000 |
+    | `reset_position()` | 1 |
     | `reach_for()` | 1 |
     | `grasp()` | 1 |
     | `drop()` | 1 |
@@ -456,8 +456,8 @@ class Transport(Magnebot):
         return super().grasp(target=target, arm=arm)
 
     def reset_position(self) -> ActionStatus:
-        self.num_actions += 1000
-        return super().teleport()
+        self.num_actions += 1
+        return super().reset_position()
 
     def get_scene_init_commands(self, scene: str, layout: int, audio: bool) -> List[dict]:
         # Clear the list of target objects and containers.
