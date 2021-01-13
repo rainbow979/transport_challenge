@@ -328,7 +328,7 @@ class Transport(Magnebot):
         self._do_arm_motion()
         state = SceneState(resp=self.communicate([]))
         # Move the target object to be over the container.
-        target = state.object_transforms[container_id].position + (QuaternionUtils.UP * 0.3)
+        target = state.object_transforms[container_id].position + (QuaternionUtils.get_up_direction(state.object_transforms[container_id].rotation) * 0.3)
         self._start_ik(target=TDWUtils.array_to_vector3(target), arm=object_arm, allow_column=False, state=state,
                        absolute=True, fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER, object_id=object_id)
         self._do_arm_motion()
@@ -343,6 +343,11 @@ class Transport(Magnebot):
         self.num_actions -= 1
 
         in_container = self._get_objects_in_container(container_id=container_id)
+        # Set the detection to discrete. This will make physics less buggy.
+        if object_id in in_container:
+            self._next_frame_commands.append({"$type": "set_object_collision_detection_mode",
+                                              "id": int(object_id),
+                                              "mode": "discrete"})
         self._end_action()
         if object_id in in_container:
             return ActionStatus.success
@@ -373,7 +378,7 @@ class Transport(Magnebot):
                 print("Magnebot isn't holding a container.")
             return ActionStatus.not_holding
         # Get all of the objects currently in the container.
-        in_container = self._get_objects_in_container(container_id=container_id)
+        in_container_0 = self._get_objects_in_container(container_id=container_id)
         self._start_action()
 
         # Get the joint IDs.
@@ -403,13 +408,20 @@ class Transport(Magnebot):
                                            "target": 35}])
         self._do_arm_motion()
         # Wait for the objects to fall out (by this point, they likely already have).
-        self._wait_until_objects_stop(in_container, state=SceneState(self.communicate([])))
+        self._wait_until_objects_stop(in_container_0, state=SceneState(self.communicate([])))
         self._next_frame_commands.extend(self._get_reset_arm_commands(arm=container_arm, reset_torso=False))
         self._do_arm_motion()
-        in_container = self._get_objects_in_container(container_id=container_id)
+        in_container_1 = self._get_objects_in_container(container_id=container_id)
+
+        # Reset the collision detection mode of objects that were poured out.
+        for object_id in in_container_0:
+            if object_id not in in_container_1:
+                self._next_frame_commands.append({"$type": "set_object_collision_detection_mode",
+                                                  "id": int(object_id),
+                                                  "mode": "continuous_dynamic"})
         self._end_action()
         self.num_actions += 1
-        if len(in_container) == 0:
+        if len(in_container_1) == 0:
             return ActionStatus.success
         else:
             return ActionStatus.still_in
@@ -443,7 +455,7 @@ class Transport(Magnebot):
         self.num_actions += 1
         return super().grasp(target=target, arm=arm)
 
-    def teleport(self) -> ActionStatus:
+    def reset_position(self) -> ActionStatus:
         self.num_actions += 1000
         return super().teleport()
 
