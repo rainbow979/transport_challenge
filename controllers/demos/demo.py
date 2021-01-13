@@ -45,7 +45,7 @@ class Demo(Transport):
         self._image_count = 0
         self._to_transport: List[int] = list()
 
-    def init_scene(self, scene: str, layout: int, room: int = None) -> ActionStatus:
+    def init_scene(self, scene: str, layout: int, room: int = None, goal_room: int = None) -> ActionStatus:
         status = super().init_scene(scene=scene, layout=layout, room=room)
 
         self._to_transport = self.target_objects[:]

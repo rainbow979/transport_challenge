@@ -4,30 +4,6 @@
 
 Transport challenge API.
 
-**This extends the Magnebot API. Please read the [Magnebot API documentation](https://github.com/alters-mit/magnebot/blob/main/doc/magnebot_controller.md).**
-
-The Magnebot API includes:
-
-- `init_scene()`
-- `turn_by()`
-- `turn_to()`
-- `move_by()`
-- `move_to()`
-- `reach_for()`
-- `grasp()`
-- `drop()`
-- `reset_arm()`
-- `rotate_camera()`
-- `reset_camera()`
-- `add_camera()`
-- `get_occupancy_position()`
-- `end()`
-
-This API includes the following changes and additions:
-
-- Procedurally add **containers** and **target objects** to the scene. Containers are boxes without lids that can hold objects; see the `containers` field. Target objects are small objects that are in navigable positions; see the `target_objects` field. Containers and target objects otherwise behave identically to any other object in terms of physics, segmentation colors, etc. and will appear in the output data alongside the other objects.
-- Higher-level actions to pick up target objects and put them in containers.
-
 ```python
 from transport_challenge import Transport
 
@@ -43,13 +19,33 @@ print(m.state.magnebot_transform.position)
 print(m.containers)
 ```
 
-***
+**This extends the Magnebot API. Please read the [Magnebot API documentation](https://github.com/alters-mit/magnebot/blob/main/doc/magnebot_controller.md).**
 
-## Class Variables
+This API includes the following changes and additions:
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| `TARGET_OBJECT_MASS ` |  | The mass of each target object. |
+- Procedurally add **containers** and **target objects** to the scene. Containers are boxes without lids that can hold objects; see the `containers` field. Target objects are small objects that are in navigable positions; see the `target_objects` field. Containers and target objects otherwise behave identically to any other object in terms of physics, segmentation colors, etc. and will appear in the output data alongside the other objects.
+- Higher-level actions to pick up target objects and put them in containers.
+- An interaction budget. Each action has a certain "cost":
+
+| Action | Cost |
+| --- | --- |
+| `init_scene()` | 0 |
+| `turn_by()` | 1 |
+| `turn_to()` | 1 |
+| `move_by()` | 1 |
+| `move_to()` | 2 |
+| `teleport()` | 1000 |
+| `reach_for()` | 1 |
+| `grasp()` | 1 |
+| `drop()` | 1 |
+| `reset_arm()` | 1 |
+| `rotate_camera()` | 0 |
+| `reset_camera()` | 0 |
+| `add_camera()` | 0 |
+| `end()` | 0 |
+| `pick_up()` | 2 |
+| `put_in()` | 1 |
+| `pour_out()` | 1 |
 
 ***
 
@@ -59,13 +55,58 @@ print(m.containers)
 
 - `containers` The IDs of each container in the scene.
 
+- `num_actions` The total number of actions taken by the Magnebot.
+
+- `goal_position` The challenge is successful when the Magnebot moves all of the target objects to the the goal zone, which is defined by this position and `Transport.GOAL_ZONE_RADIUS`. This value is set in `init_scene()`.
+
+- `goal_room` The room that `self.goal_position` is in. [See here](https://github.com/alters-mit/magnebot/tree/main/doc/images/rooms) for images of the rooms. This value is set in `init_scene()`.
+
+- `done` If True, the Magnebot successfully transported all of the objects to the goal zone. This is updated at the end of every action, including actions with 0 cost.
+
 ***
 
 ## Functions
 
-### Arm Articulation
+#### init_scene
 
-_These functions move and bend the joints of the Magnebots's arms._
+**`self.init_scene(scene, layout)`**
+
+**`self.init_scene(scene, layout, room=None, goal_room=None)`**
+
+This is the same function as `Magnebot.init_scene()` but with an additional `goal_room` parameter.
+
+
+Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
+
+- `success`
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| scene |  str |  | The name of an interior floorplan scene. Each number (1, 2, etc.) has a different shape, different rooms, etc. Each letter (a, b, c) is a cosmetically distinct variant with the same floorplan. |
+| layout |  int |  | The furniture layout of the floorplan. Each number (0, 1, 2) will populate the floorplan with different furniture in different positions. |
+| room |  int  | None | The index of the room that the Magnebot will spawn in the center of. If None, the room will be chosen randomly. |
+| goal_room |  int  | None | The goal room. If None, this is chosen randomly. See field descriptions of `goal_room` and `goal_position` in this document. |
+
+_Returns:_  An `ActionStatus` (always success).
+
+#### teleport
+
+**`self.teleport(model_name, position, rotation)`**
+
+Add a container. Cache the ID.
+
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| model_name |  |  | The name of the container. |
+| position |  |  | The initial position of the container. |
+| rotation |  |  | The initial rotation of the container. |
+
+_Returns:_  The ID of the container.
+
+### Transport Challenge
+
+_These functions are unique to the Transport Challenge API._
 
 #### pick_up
 
@@ -87,31 +128,6 @@ Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/ac
 | arm |  Arm |  | The arm of the magnet that will try to grasp the object. |
 
 _Returns:_  An `ActionStatus` indicating if the magnet at the end of the `arm` is holding the `target` and if not, why.
-
-#### reset_arm
-
-**`self.reset_arm(arm)`**
-
-**`self.reset_arm(arm, reset_torso=True)`**
-
-Reset an arm to its neutral position. Overrides `Magnebot.reset_arm()`.
-
-If the arm is holding a container, it will try to align the bottom of the container with the floor.
-This will be somewhat slow the first time the Magnebot does this for this held container.
-The Magnebot will also raise itself somewhat higher than it normally would to allow it to align the container.
-
-Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
-
-- `success`
-- `failed_to_bend`
-
-
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| arm |  Arm |  | The arm that will be reset. |
-| reset_torso |  bool  | True | If True, rotate and slide the torso to its neutral rotation and height. |
-
-_Returns:_  An `ActionStatus` indicating if the arm reset and if not, why.
 
 #### put_in
 
@@ -149,6 +165,35 @@ Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/ac
 - `still_in` (If there are objects still in the container.)
 
 _Returns:_  An `ActionStatus` indicating whether the container is now empty and if not, why.
+
+***
+
+### Inherited from Magnebot
+
+_These functions are inherited from the Magnebot API but include additional functionality._
+
+#### reset_arm
+
+**`self.reset_arm(arm)`**
+
+**`self.reset_arm(arm, reset_torso=True)`**
+
+This is the same as `Magnebot.reset_arm()` unless the arm is holding a container.
+
+If the arm is holding a container, it will try to align the bottom of the container with the floor. This will be somewhat slow the first time the Magnebot does this for this held container.
+
+Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
+
+- `success`
+- `failed_to_bend`
+
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| arm |  Arm |  | The arm that will be reset. |
+| reset_torso |  bool  | True | If True, rotate and slide the torso to its neutral rotation and height. |
+
+_Returns:_  An `ActionStatus` indicating if the arm reset and if not, why.
 
 ***
 

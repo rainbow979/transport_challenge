@@ -9,7 +9,8 @@ class FillAndPour(Transport):
     Test whether the Magnebot can put objects in a container, move them around the scene, pour out the container.
     """
 
-    def init_scene(self, scene: str = None, layout: int = None, room: int = None) -> ActionStatus:
+    def init_scene(self, scene: str = None, layout: int = None, room: int = None,
+                   goal_room: int = None) -> ActionStatus:
         origin = np.array([0, 0, 0])
         commands = [{"$type": "load_scene",
                      "scene_name": "ProcGenScene"},

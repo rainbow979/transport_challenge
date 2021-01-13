@@ -9,7 +9,8 @@ class Level(Transport):
     Test whether the Magnebot can level-off the orientation of the container.
     """
 
-    def init_scene(self, scene: str = None, layout: int = None, room: int = None) -> ActionStatus:
+    def init_scene(self, scene: str = None, layout: int = None, room: int = None,
+                   goal_room: int = None) -> ActionStatus:
         commands = [{"$type": "load_scene",
                      "scene_name": "ProcGenScene"},
                     TDWUtils.create_empty_room(12, 12)]
