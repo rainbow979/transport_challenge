@@ -64,12 +64,12 @@ class Transport(Magnebot):
     """:class_var
     The mass of each target object.
     """
-    TARGET_OBJECT_MASS = 0.25
+    TARGET_OBJECT_MASS: float = 0.25
 
     """:class_var
     The goal zone is a circle defined by `self.goal_center` and this radius value.
     """
-    GOAL_ZONE_RADIUS = 1
+    GOAL_ZONE_RADIUS: float = 1
 
     # The scale factor of each container relative to its original size.
     __CONTAINER_SCALE = {"x": 0.6, "y": 0.4, "z": 0.6}

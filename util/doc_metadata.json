@@ -7,7 +7,7 @@
     },
     "Inherited from Magnebot": {
       "description": "These functions are inherited from the Magnebot API but include additional functionality.",
-      "functions": ["reset_arm"]
+      "functions": ["init_scene", "reset_arm"]
     },
     "Ignore": {
       "description": "",

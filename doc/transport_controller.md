@@ -34,7 +34,7 @@ This API includes the following changes and additions:
 | `turn_to()` | 1 |
 | `move_by()` | 1 |
 | `move_to()` | 2 |
-| `teleport()` | 1000 |
+| `reset_position()` | 1 |
 | `reach_for()` | 1 |
 | `grasp()` | 1 |
 | `drop()` | 1 |
@@ -46,6 +46,15 @@ This API includes the following changes and additions:
 | `pick_up()` | 2 |
 | `put_in()` | 1 |
 | `pour_out()` | 1 |
+
+***
+
+## Class Variables
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| `TARGET_OBJECT_MASS` | float | The mass of each target object. |
+| `GOAL_ZONE_RADIUS` | float | The goal zone is a circle defined by `self.goal_center` and this radius value. |
 
 ***
 
@@ -66,43 +75,6 @@ This API includes the following changes and additions:
 ***
 
 ## Functions
-
-#### init_scene
-
-**`self.init_scene(scene, layout)`**
-
-**`self.init_scene(scene, layout, room=None, goal_room=None)`**
-
-This is the same function as `Magnebot.init_scene()` but with an additional `goal_room` parameter.
-
-
-Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
-
-- `success`
-
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| scene |  str |  | The name of an interior floorplan scene. Each number (1, 2, etc.) has a different shape, different rooms, etc. Each letter (a, b, c) is a cosmetically distinct variant with the same floorplan. |
-| layout |  int |  | The furniture layout of the floorplan. Each number (0, 1, 2) will populate the floorplan with different furniture in different positions. |
-| room |  int  | None | The index of the room that the Magnebot will spawn in the center of. If None, the room will be chosen randomly. |
-| goal_room |  int  | None | The goal room. If None, this is chosen randomly. See field descriptions of `goal_room` and `goal_position` in this document. |
-
-_Returns:_  An `ActionStatus` (always success).
-
-#### teleport
-
-**`self.teleport(model_name, position, rotation)`**
-
-Add a container. Cache the ID.
-
-
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| model_name |  |  | The name of the container. |
-| position |  |  | The initial position of the container. |
-| rotation |  |  | The initial rotation of the container. |
-
-_Returns:_  The ID of the container.
 
 ### Transport Challenge
 
@@ -171,6 +143,28 @@ _Returns:_  An `ActionStatus` indicating whether the container is now empty and 
 ### Inherited from Magnebot
 
 _These functions are inherited from the Magnebot API but include additional functionality._
+
+#### init_scene
+
+**`self.init_scene(scene, layout)`**
+
+**`self.init_scene(scene, layout, room=None, goal_room=None)`**
+
+This is the same function as `Magnebot.init_scene()` but with an additional `goal_room` parameter.
+
+
+Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
+
+- `success`
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| scene |  str |  | The name of an interior floorplan scene. Each number (1, 2, etc.) has a different shape, different rooms, etc. Each letter (a, b, c) is a cosmetically distinct variant with the same floorplan. |
+| layout |  int |  | The furniture layout of the floorplan. Each number (0, 1, 2) will populate the floorplan with different furniture in different positions. |
+| room |  int  | None | The index of the room that the Magnebot will spawn in the center of. If None, the room will be chosen randomly. |
+| goal_room |  int  | None | The goal room. If None, this is chosen randomly. See field descriptions of `goal_room` and `goal_position` in this document. |
+
+_Returns:_  An `ActionStatus` (always success).
 
 #### reset_arm
 
