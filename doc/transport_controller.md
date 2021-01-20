@@ -26,7 +26,7 @@ This API includes the following changes and additions:
 - Procedurally add **containers** and **target objects** to the scene. Containers are boxes without lids that can hold objects; see the `containers` field. Target objects are small objects that must be transported to the goal zone; see the `target_objects` field. These containers and target objects are included alongside all other objects in [`self.objects_static` and `self.state`](https://github.com/alters-mit/magnebot/blob/main/doc/magnebot_controller.md#fields).    - Higher-level actions to pick up target objects and put them in containers.
 - A few new actions: `pick_up()`, `put_in()`, and `pour_out()`
 - Modified behavior for certain Magnebot actions such as `reset_arm()`
-- An interaction budget. The field `num_actions` increments by an action's "cost" at the end of the action:
+- An interaction budget. The field `action_cost` increments by an action's "cost" at the end of the action:
 
 | Action | Cost |
 | --- | --- |
@@ -47,6 +47,7 @@ This API includes the following changes and additions:
 | `pick_up()` | 2 |
 | `put_in()` | 1 |
 | `pour_out()` | 1 |
+| `get_target_objects_in_goal_zone()` | 0 |
 
 ***
 
@@ -65,7 +66,7 @@ This API includes the following changes and additions:
 
 - `containers` The IDs of each container in the scene.
 
-- `num_actions` The total number of actions taken by the Magnebot.
+- `action_cost` The total number of actions taken by the Magnebot.
 
 - `goal_position` The challenge is successful when the Magnebot moves all of the target objects to the the goal zone, which is defined by this position and `Transport.GOAL_ZONE_RADIUS`. This value is set in `init_scene()`.
 
@@ -138,6 +139,12 @@ Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/ac
 - `still_in` (If there are objects still in the container.)
 
 _Returns:_  An `ActionStatus` indicating whether the container is now empty and if not, why.
+
+#### get_target_objects_in_goal_zone
+
+**`self.get_target_objects_in_goal_zone()`**
+
+_Returns:_  A list of IDs of all of the target objects currently in the goal zone.
 
 ***
 

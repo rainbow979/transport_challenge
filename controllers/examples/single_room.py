@@ -1,3 +1,4 @@
+from pathlib import Path
 from tdw.tdw_utils import TDWUtils
 from magnebot import Magnebot, ActionStatus, Arm
 from transport_challenge import Transport
@@ -65,6 +66,10 @@ class SingleRoom(Transport):
                 got_container = True
             else:
                 self.reset_arm(arm=Arm.right)
+                # Back up and try again.
+                # This isn't a very robust approach.
+                # In an actual use-case, the actions will vary depending on the position of the object,
+                # the position of the Magnebot, etc.
                 self.move_by(-0.5)
                 self.turn_by(15)
                 self.move_to(target=container_id)
@@ -109,7 +114,8 @@ class SingleRoom(Transport):
 if __name__ == "__main__":
     # Instantiate the controller.
     # For this example, we set the random seed so that we know where the target objects and containers will be.
-    m = SingleRoom(launch_build=False, random_seed=12)
+    m = SingleRoom(launch_build=False, random_seed=12, auto_save_images=True)
+    print(f"Images will be saved to: {Path(m.images_directory).resolve()}")
 
     # We know that there are target objects and a container in this room because of the random seed in the constructor.
     m.init_scene(scene="5a", layout=2, room=2, goal_room=2)
@@ -118,23 +124,21 @@ if __name__ == "__main__":
 
     num_in_container = 0
     # Transport objects to the goal position.
-    for target_object in m.target_objects:
-        # If the container is mostly full, bring it to the goal position and pour it out.
-        if num_in_container == 3:
-            print("Bringing target objects to the goal zone.")
-            m.move_to(target=TDWUtils.array_to_vector3(m.goal_position))
-            m.pour_out()
-            print("Poured out objects.")
-            num_in_container = 0
-            break
-        # Check if we're done now.
-        if m.done:
-            print("DONE!")
-            print(f"Number of actions: {m.num_actions}")
-            break
-
+    for target_object in m.target_objects[:3]:
         in_container = m.put_object_in_container(object_id=target_object)
         if in_container:
             # Record the object as being in the container.
             num_in_container += 1
+    # If the container is mostly full, bring it to the goal position and pour it out.
+    if num_in_container == 3:
+        print("Bringing target objects to the goal zone.")
+        m.move_to(target=TDWUtils.array_to_vector3(m.goal_position))
+        m.pour_out()
+        print("Poured out objects.")
+        num_in_container = 0
+
+    # Not all of the objects that were in the container are in the goal zone.
+    # They might have bounced or rolled away.
+    print(f"Objects in the goal zone: {m.get_target_objects_in_goal_zone()}")
+    print(f"Action cost: {m.action_cost}")
     m.end()

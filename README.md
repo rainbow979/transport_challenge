@@ -44,6 +44,11 @@ m.end()
 - **[API documentation](https://github.com/alters-mit/transport_challenge/blob/main/doc/transport_controller.md)**
 - [Changelog](https://github.com/alters-mit/transport_challenge/blob/main/doc/changelog.md)
 
-# Examples
+# Example controllers
 
-See: [`controllers/examples/single_room.py`](https://github.com/alters-mit/transport_challenge/tree/main/controllers/examples)
+- [This controller](https://github.com/alters-mit/transport_challenge/tree/main/controllers/examples/single_room.py) is an *example use-case*. It uses very naive logic to navigate (it assumes that everything is in the same room and that there aren't obstructions between objects) but it should be a good example of how to use this API.
+- [This controller](https://github.com/alters-mit/transport_challenge/tree/main/controllers/demos/demo.py) is a *demo controller*. It is visually indicative of an actual use-case and includes an overhead camera so that it's easy to see what's going on. However, this controller includes a lot of code that you shouldn't add to your controller, including:
+  - It uses a pre-scripted path for navigation.
+  - It adds a second camera and saves images every frame instead of per action. This means that it is much slower than a use-case controller.
+  - It uses a lot of low-level TDW commands to ideally set up the scene for rendering, such as hiding the roof.
+- [These controllers](https://github.com/alters-mit/transport_challenge/tree/main/controllers/tests) are *test controllers*. They are meant only for testing the API.

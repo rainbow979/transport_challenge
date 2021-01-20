@@ -39,7 +39,7 @@ class Transport(Magnebot):
     - Procedurally add **containers** and **target objects** to the scene. Containers are boxes without lids that can hold objects; see the `containers` field. Target objects are small objects that must be transported to the goal zone; see the `target_objects` field. These containers and target objects are included alongside all other objects in [`self.objects_static` and `self.state`](https://github.com/alters-mit/magnebot/blob/main/doc/magnebot_controller.md#fields).    - Higher-level actions to pick up target objects and put them in containers.
     - A few new actions: `pick_up()`, `put_in()`, and `pour_out()`
     - Modified behavior for certain Magnebot actions such as `reset_arm()`
-    - An interaction budget. The field `num_actions` increments by an action's "cost" at the end of the action:
+    - An interaction budget. The field `action_cost` increments by an action's "cost" at the end of the action:
 
     | Action | Cost |
     | --- | --- |
@@ -60,6 +60,7 @@ class Transport(Magnebot):
     | `pick_up()` | 2 |
     | `put_in()` | 1 |
     | `pour_out()` | 1 |
+    | `get_target_objects_in_goal_zone()` | 0 |
     """
 
     """:class_var
@@ -116,7 +117,7 @@ class Transport(Magnebot):
         """:field
         The total number of actions taken by the Magnebot.
         """
-        self.num_actions: int = 0
+        self.action_cost: int = 0
 
         """:field
          The challenge is successful when the Magnebot moves all of the target objects to the the goal zone, which is defined by this position and `Transport.GOAL_ZONE_RADIUS`. This value is set in `init_scene()`.
@@ -202,7 +203,7 @@ class Transport(Magnebot):
                 print(f"Already holding an object in {arm.name}")
             return ActionStatus.failed_to_grasp
 
-        # This will increment `self.num_actions`.
+        # This will increment `self.action_cost`.
         status = self.grasp(target=target, arm=arm)
 
         if status != ActionStatus.success:
@@ -227,7 +228,7 @@ class Transport(Magnebot):
         :return: An `ActionStatus` indicating if the arm reset and if not, why.
         """
 
-        self.num_actions += 1
+        self.action_cost += 1
 
         # Use cached angles to reset an arm holding a container.
         if arm in self._container_arm_reset_angles:
@@ -344,7 +345,7 @@ class Transport(Magnebot):
         # Reset the arms.
         self.reset_arm(arm=container_arm, reset_torso=False)
         self.reset_arm(arm=object_arm, reset_torso=True)
-        self.num_actions -= 1
+        self.action_cost -= 1
 
         in_container = self._get_objects_in_container(container_id=container_id)
         # Set the detection to discrete. This will make physics less buggy.
@@ -424,11 +425,32 @@ class Transport(Magnebot):
                                                   "id": int(object_id),
                                                   "mode": "continuous_dynamic"})
         self._end_action()
-        self.num_actions += 1
+        self.action_cost += 1
         if len(in_container_1) == 0:
             return ActionStatus.success
         else:
             return ActionStatus.still_in
+
+    def get_target_objects_in_goal_zone(self) -> List[int]:
+        """
+        :return: A list of IDs of all of the target objects currently in the goal zone.
+        """
+
+        objects: List[int] = list()
+
+        # Objects that are still being held by the Magnebot don't count.
+        held: List[int] = list()
+        for arm in self.state.held:
+            for object_id in self.state.held[arm]:
+                if object_id in self.target_objects:
+                    held.append(object_id)
+        # The object must be in the goal zone and on the floor.
+        for object_id in self.target_objects:
+            if self.state.object_transforms[object_id].position[1] <= 0.1 and \
+                    np.linalg.norm(self.state.object_transforms[object_id].position - self.goal_position) <= \
+                    Transport.GOAL_ZONE_RADIUS:
+                objects.append(object_id)
+        return objects
 
     def drop(self, target: int, arm: Arm, wait_for_objects: bool = True) -> ActionStatus:
         status = super().drop(target=target, arm=arm, wait_for_objects=wait_for_objects)
@@ -436,31 +458,31 @@ class Transport(Magnebot):
             # Remove the cached container arm angles.
             if arm in self._container_arm_reset_angles:
                 del self._container_arm_reset_angles[arm]
-        self.num_actions += 1
+        self.action_cost += 1
         return status
 
     def turn_by(self, angle: float, aligned_at: float = 3) -> ActionStatus:
-        self.num_actions += 1
+        self.action_cost += 1
         return super().turn_by(angle=angle, aligned_at=aligned_at)
 
     def turn_to(self, target: Union[int, Dict[str, float]], aligned_at: float = 3) -> ActionStatus:
-        self.num_actions += 1
+        self.action_cost += 1
         return super().turn_to(target=target, aligned_at=aligned_at)
 
     def move_by(self, distance: float, arrived_at: float = 0.3) -> ActionStatus:
-        self.num_actions += 1
+        self.action_cost += 1
         return super().move_by(distance=distance, arrived_at=arrived_at)
 
     def reach_for(self, target: Dict[str, float], arm: Arm, absolute: bool = True, arrived_at: float = 0.125) -> ActionStatus:
-        self.num_actions += 1
+        self.action_cost += 1
         return super().reach_for(target=target, arm=arm, absolute=absolute, arrived_at=arrived_at)
 
     def grasp(self, target: int, arm: Arm) -> ActionStatus:
-        self.num_actions += 1
+        self.action_cost += 1
         return super().grasp(target=target, arm=arm)
 
     def reset_position(self) -> ActionStatus:
-        self.num_actions += 1
+        self.action_cost += 1
         return super().reset_position()
 
     def get_scene_init_commands(self, scene: str, layout: int, audio: bool) -> List[dict]:
@@ -531,7 +553,7 @@ class Transport(Magnebot):
 
     def _cache_static_data(self, resp: List[bytes]) -> None:
         # Reset the action counter and challenge status.
-        self.num_actions = 0
+        self.action_cost = 0
         self.done = False
         super()._cache_static_data(resp=resp)
 
@@ -636,19 +658,7 @@ class Transport(Magnebot):
         :return: True if all of the objects have been transported to the goal zone.
         """
 
-        # The challenge is incomplete as long as the Magnebot is holding a target object.
-        for arm in self.state.held:
-            for object_id in self.state.held[arm]:
-                if object_id in self.target_objects:
-                    return False
-        # The challenge is incomplete as long as some target objects are outside of the goal zone or too high up
-        # (implying that they're in a container).
-        for object_id in self.target_objects:
-            if self.state.object_transforms[object_id].position[1] > 0.1 or \
-                    np.linalg.norm(self.state.object_transforms[object_id].position - self.goal_position) > \
-                    Transport.GOAL_ZONE_RADIUS:
-                return False
-        return True
+        return len(self.get_target_objects_in_goal_zone()) == len(self.target_objects)
 
     def _end_action(self) -> None:
         super()._end_action()
