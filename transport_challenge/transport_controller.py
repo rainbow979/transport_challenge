@@ -36,9 +36,10 @@ class Transport(Magnebot):
 
     This API includes the following changes and additions:
 
-    - Procedurally add **containers** and **target objects** to the scene. Containers are boxes without lids that can hold objects; see the `containers` field. Target objects are small objects that are in navigable positions; see the `target_objects` field. Containers and target objects otherwise behave identically to any other object in terms of physics, segmentation colors, etc. and will appear in the output data alongside the other objects.
-    - Higher-level actions to pick up target objects and put them in containers.
-    - An interaction budget. Each action has a certain "cost":
+    - Procedurally add **containers** and **target objects** to the scene. Containers are boxes without lids that can hold objects; see the `containers` field. Target objects are small objects that must be transported to the goal zone; see the `target_objects` field. These containers and target objects are included alongside all other objects in [`self.objects_static` and `self.state`](https://github.com/alters-mit/magnebot/blob/main/doc/magnebot_controller.md#fields).    - Higher-level actions to pick up target objects and put them in containers.
+    - A few new actions: `pick_up()`, `put_in()`, and `pour_out()`
+    - Modified behavior for certain Magnebot actions such as `reset_arm()`
+    - An interaction budget. The field `num_actions` increments by an action's "cost" at the end of the action:
 
     | Action | Cost |
     | --- | --- |
@@ -88,7 +89,7 @@ class Transport(Magnebot):
 
     def __init__(self, port: int = 1071, launch_build: bool = True, screen_width: int = 256, screen_height: int = 256,
                  debug: bool = False, auto_save_images: bool = False, images_directory: str = "images",
-                 random_seed: int = None):
+                 random_seed: int = None, img_is_png: bool = True):
         """
         :param port: The socket port. [Read this](https://github.com/threedworld-mit/tdw/blob/master/Documentation/getting_started.md#command-line-arguments) for more information.
         :param launch_build: If True, the build will launch automatically on the default port (1071). If False, you will need to launch the build yourself (for example, from a Docker container).
@@ -98,11 +99,12 @@ class Transport(Magnebot):
         :param images_directory: The output directory for images if `auto_save_images == True`.
         :param debug: If True, enable debug mode. This controller will output messages to the console, including any warnings or errors sent by the build. It will also create 3D plots of arm articulation IK solutions.
         :param random_seed: The random seed used for setting the start position of the Magnebot, the goal room, and the target objects and containers.
+        :param img_is_png: If True, the `img` pass images will be .png files. If False,  the `img` pass images will be .jpg files, which are smaller; the build will run approximately 2% faster.
         """
 
         super().__init__(port=port, launch_build=launch_build, screen_width=screen_width, screen_height=screen_height,
                          debug=debug, auto_save_images=auto_save_images, images_directory=images_directory,
-                         random_seed=random_seed)
+                         random_seed=random_seed, img_is_png=img_is_png)
         """:field
         The IDs of each target object in the scene.
         """
@@ -143,7 +145,9 @@ class Transport(Magnebot):
 
     def init_scene(self, scene: str, layout: int, room: int = None, goal_room: int = None) -> ActionStatus:
         """
-        This is the same function as `Magnebot.init_scene()` but with an additional `goal_room` parameter.
+        This is the same function as `Magnebot.init_scene()` but it adds target objects and containers to the scene.
+
+        When `init_scene()` is called, 8-12 target objects will be randomly placed on the floor of a randomly-selected room. Then, there is a 25% chance of adding one container per room.
 
         :param scene: The name of an interior floorplan scene. Each number (1, 2, etc.) has a different shape, different rooms, etc. Each letter (a, b, c) is a cosmetically distinct variant with the same floorplan.
         :param layout: The furniture layout of the floorplan. Each number (0, 1, 2) will populate the floorplan with different furniture in different positions.

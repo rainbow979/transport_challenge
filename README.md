@@ -1,10 +1,14 @@
 # Transport Challenge
 
-The **Transport Challenge API** is an extension of the [Magnebot API](https://github.com/alters-mit/magnebot) which in turn is built on the [TDW simulation platform](https://github.com/threedworld-mit/tdw). In the Transport Challenge API, the Magnebot must transport **target objects** with the aid of **containers** from one room to the **goal zone**.
+In the Transport Challenge API, the [**Magnebot**](https://github.com/alters-mit/magnebot) must transport **target objects** (small objects scattered on the floor of a randomly-chosen room) with the aid of **containers** (box-shaped objects without lids that can hold target objects) to the **goal zone** (a circle defined by a position and a radius in the center of a room and the scene).
 
-**[Read the API documentation here.](doc/transport_controller.md)**
+If all of the target objects are in the goal zone, the task is successful.
 
-<img src="doc/images/api_hierarchy.png" style="zoom:67%;" />
+**[Read the API documentation here.](https://github.com/alters-mit/transport_challenge/blob/main/doc/transport_controller.md)**
+
+The Transport Challenge API is an extension of the [Magnebot API](https://github.com/alters-mit/magnebot) which in turn is built on the [TDW simulation platform](https://github.com/threedworld-mit/tdw).
+
+<img src="doc/images/api_hierarchy.png" style="zoom:50%;" />
 
 # Installation
 
@@ -35,17 +39,11 @@ m.end()
 
 2. [Launch the TDW build.](https://github.com/threedworld-mit/tdw/blob/master/Documentation/getting_started.md)
 
-# Concepts
-
-- **Target objects** are small objects that must be transported. At the start of the simulation, the target objects are scattered on the floor of a single randomly-chosen room. See: `self.target_objects`
-- **Containers** are box-shaped objects without lids that can hold target objects. At the start of the simulation, there is a 25% chance that a container will be placed on the floor of a room. See: `self.containers` 
-- The **goal zone** is a circle defined by a position and a radius in the center of a room and the scene. If all of the target objects are in this circle, the task is successful.
-
 # Documentation
 
-**[Read the API documentation here.](doc/transport_controller.md)** The API includes all of the actions in the Magnebot API plus actions unique to the Transport Challenge API: `pick_up()`, `put_in()`, and `pour_out()`.
+- **[API documentation](https://github.com/alters-mit/transport_challenge/blob/main/doc/transport_controller.md)**
+- [Changelog](https://github.com/alters-mit/transport_challenge/blob/main/doc/changelog.md)
 
 # Examples
 
-See: `controllers/examples/single_room.py`
-
+See: [`controllers/examples/single_room.py`](https://github.com/alters-mit/transport_challenge/tree/main/controllers/examples)
