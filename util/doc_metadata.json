@@ -6,7 +6,7 @@
       "functions": ["pick_up", "put_in", "pour_out"]
     },
     "Inherited from Magnebot": {
-      "description": "These functions are inherited from the Magnebot API but include additional functionality.",
+      "description": "These functions are inherited from the Magnebot API but include additional functionality. Read the Magnebot API for a list of all available functions.",
       "functions": ["init_scene", "reset_arm"]
     },
     "Ignore": {

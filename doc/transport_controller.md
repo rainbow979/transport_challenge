@@ -23,9 +23,10 @@ print(m.containers)
 
 This API includes the following changes and additions:
 
-- Procedurally add **containers** and **target objects** to the scene. Containers are boxes without lids that can hold objects; see the `containers` field. Target objects are small objects that are in navigable positions; see the `target_objects` field. Containers and target objects otherwise behave identically to any other object in terms of physics, segmentation colors, etc. and will appear in the output data alongside the other objects.
-- Higher-level actions to pick up target objects and put them in containers.
-- An interaction budget. Each action has a certain "cost":
+- Procedurally add **containers** and **target objects** to the scene. Containers are boxes without lids that can hold objects; see the `containers` field. Target objects are small objects that must be transported to the goal zone; see the `target_objects` field. These containers and target objects are included alongside all other objects in [`self.objects_static` and `self.state`](https://github.com/alters-mit/magnebot/blob/main/doc/magnebot_controller.md#fields).    - Higher-level actions to pick up target objects and put them in containers.
+- A few new actions: `pick_up()`, `put_in()`, and `pour_out()`
+- Modified behavior for certain Magnebot actions such as `reset_arm()`
+- An interaction budget. The field `num_actions` increments by an action's "cost" at the end of the action:
 
 | Action | Cost |
 | --- | --- |
@@ -142,7 +143,7 @@ _Returns:_  An `ActionStatus` indicating whether the container is now empty and 
 
 ### Inherited from Magnebot
 
-_These functions are inherited from the Magnebot API but include additional functionality._
+_These functions are inherited from the Magnebot API but include additional functionality. Read the Magnebot API for a list of all available functions._
 
 #### init_scene
 
@@ -150,7 +151,9 @@ _These functions are inherited from the Magnebot API but include additional func
 
 **`self.init_scene(scene, layout, room=None, goal_room=None)`**
 
-This is the same function as `Magnebot.init_scene()` but with an additional `goal_room` parameter.
+This is the same function as `Magnebot.init_scene()` but it adds target objects and containers to the scene.
+
+When `init_scene()` is called, 8-12 target objects will be randomly placed on the floor of a randomly-selected room. Then, there is a 25% chance of adding one container per room.
 
 
 Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/action_status.md):
