@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+### `Transport` class
+
+- Set `launch_build` default value to False (was True)
+
 ## 0.1.1
 
 ### `Transport` class
