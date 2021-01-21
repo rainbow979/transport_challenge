@@ -5,10 +5,8 @@ import numpy as np
 from tdw.py_impact import ObjectInfo, AudioMaterial
 from tdw.librarian import ModelLibrarian
 from tdw.tdw_utils import TDWUtils, QuaternionUtils
-from tdw.output_data import Overlap
 from magnebot import Magnebot, Arm, ActionStatus, ArmJoint
 from magnebot.scene_state import SceneState
-from magnebot.util import get_data
 from magnebot.paths import ROOM_MAPS_DIRECTORY, OCCUPANCY_MAPS_DIRECTORY, SCENE_BOUNDS_PATH, SPAWN_POSITIONS_PATH
 from transport_challenge.paths import TARGET_OBJECT_MATERIALS_PATH, TARGET_OBJECTS_PATH, CONTAINERS_PATH
 
@@ -336,6 +334,15 @@ class Transport(Magnebot):
         target = state.object_transforms[container_id].position + (QuaternionUtils.get_up_direction(state.object_transforms[container_id].rotation) * 0.3)
         self._start_ik(target=TDWUtils.array_to_vector3(target), arm=object_arm, allow_column=False, state=state,
                        absolute=True, fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER, object_id=object_id)
+        # Get the ID of the wrist.
+        if object_arm == Arm.right:
+            wrist_id = self.magnebot_static.arm_joints[ArmJoint.wrist_right]
+        else:
+            wrist_id = self.magnebot_static.arm_joints[ArmJoint.wrist_left]
+        # Move the wrist down for a better angle.
+        self._next_frame_commands.extend([{"$type": "set_spherical_target",
+                                           "joint_id": wrist_id,
+                                           "target": {"x": -45, "y": 0, "z": 0}}])
         self._do_arm_motion()
         # Drop the object.
         self._append_drop_commands(object_id=object_id, arm=object_arm)
@@ -343,8 +350,8 @@ class Transport(Magnebot):
         self._wait_until_objects_stop(object_ids=[object_id], state=SceneState(self.communicate([])))
 
         # Reset the arms.
-        self.reset_arm(arm=container_arm, reset_torso=False)
-        self.reset_arm(arm=object_arm, reset_torso=True)
+        self.reset_arm(arm=object_arm, reset_torso=False)
+        self.reset_arm(arm=container_arm, reset_torso=True)
         self.action_cost -= 1
 
         in_container = self._get_objects_in_container(container_id=container_id)
@@ -579,6 +586,12 @@ class Transport(Magnebot):
         self._object_init_commands[object_id].append({"$type": "set_mass",
                                                       "id": object_id,
                                                       "mass": Transport.__CONTAINER_MASS})
+        self._object_init_commands[object_id].append({"$type": "add_trigger_collider",
+                                                      "id": object_id,
+                                                      "shape": "cube",
+                                                      "enter": True,
+                                                      "stay": True,
+                                                      "exit": False})
         return object_id
 
     def _add_target_object(self, model_name: str, position: Dict[str, float]) -> int:
@@ -641,17 +654,10 @@ class Transport(Magnebot):
         :return: A list of objects in the container.
         """
 
-        state = SceneState(self.communicate([]))
-
-        # Check if the object is in the container.
-        resp = self.communicate({"$type": "send_overlap_box",
-                                 "position": TDWUtils.array_to_vector3(
-                                     state.object_transforms[container_id].position),
-                                 "rotation": TDWUtils.array_to_vector4(
-                                     state.object_transforms[container_id].rotation),
-                                 "half_extents": TDWUtils.array_to_vector3(self.objects_static[container_id].size / 2)})
-        overlap = get_data(resp=resp, d_type=Overlap)
-        return [int(o_id) for o_id in overlap.get_object_ids() if int(o_id) != container_id]
+        if container_id not in self._trigger_events:
+            return list()
+        else:
+            return self._trigger_events[container_id]
 
     def _is_challenge_done(self) -> bool:
         """
@@ -663,3 +669,10 @@ class Transport(Magnebot):
     def _end_action(self) -> None:
         super()._end_action()
         self.done = self._is_challenge_done()
+
+    def _get_bounds_sides(self, target: int) -> Tuple[List[np.array], List[bytes]]:
+        sides, resp = super()._get_bounds_sides(target=target)
+        # Don't try to pick up the top or bottom of a container.
+        if target in self.containers:
+            sides = sides[:-2]
+        return sides, resp
