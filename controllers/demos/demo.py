@@ -35,7 +35,7 @@ class Demo(Transport):
                  images_directory: str = "images", image_pass_only: bool = False, overhead_camera_only: bool = False):
         super().__init__(port=port, launch_build=False, screen_width=screen_width, screen_height=screen_height,
                          auto_save_images=False, debug=False, images_directory=images_directory, random_seed=9,
-                         img_is_png=False)
+                         img_is_png=False, skip_frames=0)
 
         self.image_directories: Dict[str, Path] = dict()
         self.image_pass_only = image_pass_only

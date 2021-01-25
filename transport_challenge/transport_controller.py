@@ -88,7 +88,7 @@ class Transport(Magnebot):
 
     def __init__(self, port: int = 1071, launch_build: bool = False, screen_width: int = 256, screen_height: int = 256,
                  debug: bool = False, auto_save_images: bool = False, images_directory: str = "images",
-                 random_seed: int = None, img_is_png: bool = True):
+                 random_seed: int = None, img_is_png: bool = True, skip_frames: int = 20):
         """
         :param port: The socket port. [Read this](https://github.com/threedworld-mit/tdw/blob/master/Documentation/getting_started.md#command-line-arguments) for more information.
         :param launch_build: If True, the build will launch automatically on the default port (1071). If False, you will need to launch the build yourself (for example, from a Docker container).
@@ -98,12 +98,13 @@ class Transport(Magnebot):
         :param images_directory: The output directory for images if `auto_save_images == True`.
         :param debug: If True, enable debug mode. This controller will output messages to the console, including any warnings or errors sent by the build. It will also create 3D plots of arm articulation IK solutions.
         :param random_seed: The random seed used for setting the start position of the Magnebot, the goal room, and the target objects and containers.
-        :param img_is_png: If True, the `img` pass images will be .png files. If False,  the `img` pass images will be .jpg files, which are smaller; the build will run approximately 2% faster.
+        :param img_is_png: If True, the `img` pass images will be .png files. If False, the `img` pass images will be .jpg files, which are smaller; the build will run approximately 2% faster.
+        :param skip_frames: The build will return output data this many frames per `communicate()` call. This will greatly speed up the simulation. If you want to render every frame, set this to 0.
         """
 
         super().__init__(port=port, launch_build=launch_build, screen_width=screen_width, screen_height=screen_height,
                          debug=debug, auto_save_images=auto_save_images, images_directory=images_directory,
-                         random_seed=random_seed, img_is_png=img_is_png)
+                         random_seed=random_seed, img_is_png=img_is_png, skip_frames=skip_frames)
         """:field
         The IDs of each target object in the scene.
         """
@@ -313,6 +314,8 @@ class Transport(Magnebot):
             return ActionStatus.not_holding
 
         self._start_action()
+        self._next_frame_commands.append({"$type": "set_immovable",
+                                          "immovable": True})
         # Move the other arm out of the way.
         if container_arm == Arm.right:
             elbow_id = self.magnebot_static.arm_joints[ArmJoint.elbow_left]
@@ -346,6 +349,10 @@ class Transport(Magnebot):
         self._do_arm_motion()
         # Drop the object.
         self._append_drop_commands(object_id=object_id, arm=object_arm)
+        # Set the detection mode to discrete. This will make physics less buggy.
+        self._next_frame_commands.append({"$type": "set_object_collision_detection_mode",
+                                          "id": int(object_id),
+                                          "mode": "discrete"})
         # Wait for the object to fall (hopefully into the container).
         self._wait_until_objects_stop(object_ids=[object_id], state=SceneState(self.communicate([])))
 
@@ -355,11 +362,11 @@ class Transport(Magnebot):
         self.action_cost -= 1
 
         in_container = self._get_objects_in_container(container_id=container_id)
-        # Set the detection to discrete. This will make physics less buggy.
-        if object_id in in_container:
+        # If the object isn't in in the container, set the detection mode to the default.
+        if object_id not in in_container:
             self._next_frame_commands.append({"$type": "set_object_collision_detection_mode",
                                               "id": int(object_id),
-                                              "mode": "discrete"})
+                                              "mode": "continuous_dynamic"})
         self._end_action()
         if object_id in in_container:
             return ActionStatus.success
@@ -672,7 +679,14 @@ class Transport(Magnebot):
 
     def _get_bounds_sides(self, target: int) -> Tuple[List[np.array], List[bytes]]:
         sides, resp = super()._get_bounds_sides(target=target)
+        # Set the y value to the highest point.
+        max_y = -np.inf
+        for s in sides:
+            if s[1] > max_y:
+                max_y = s[1]
+        sides = [np.array((s[0], max_y, s[2])) for s in sides]
         # Don't try to pick up the top or bottom of a container.
         if target in self.containers:
             sides = sides[:-2]
+
         return sides, resp
