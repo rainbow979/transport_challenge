@@ -184,7 +184,7 @@ class Transport(Magnebot):
 
         - `success`
         - `cannot_reach`
-        - `failed_to_grasp` (Either because the motion failed or because the magnet is already holding an object.)
+        - `failed_to_grasp` (Either because the motion failed or because the magnet is already holding a different object.)
         - `failed_to_bend`
 
         :param target: The ID of the target object.
@@ -203,12 +203,12 @@ class Transport(Magnebot):
             return ActionStatus.failed_to_grasp
 
         # This will increment `self.action_cost`.
-        status = self.grasp(target=target, arm=arm)
-
-        if status != ActionStatus.success:
-            self._end_action()
-            return status
-        return self.reset_arm(arm=arm, reset_torso=True)
+        grasp_status = self.grasp(target=target, arm=arm)
+        reset_status = self.reset_arm(arm=arm, reset_torso=True)
+        self._end_action()
+        if grasp_status != ActionStatus.success:
+            return grasp_status
+        return reset_status
 
     def reset_arm(self, arm: Arm, reset_torso: bool = True) -> ActionStatus:
         """

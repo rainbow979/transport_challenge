@@ -65,7 +65,7 @@ class SingleRoom(Transport):
                 print("Picked up a container.")
                 got_container = True
             else:
-                self.reset_arm(arm=Arm.right)
+                print("Failed to pick up a container. Trying again...")
                 # Back up and try again.
                 # This isn't a very robust approach.
                 # In an actual use-case, the actions will vary depending on the position of the object,
@@ -73,7 +73,6 @@ class SingleRoom(Transport):
                 self.move_by(-0.5)
                 self.turn_by(15)
                 self.move_to(target=container_id)
-                print("Failed to pick up a container. Trying again...")
 
     def put_object_in_container(self, object_id: int) -> bool:
         """
@@ -92,13 +91,25 @@ class SingleRoom(Transport):
 
         # Try to go to the object and pick it up.
         # This is a VERY naive navigation solution. It doesn't check for obstructions.
-        # And, if the Magnebot fails to pick up the object, it will simply skip it.
         status = self.move_to(target=object_id)
+
+        # Back up and try again.
+        direction = 1
+        num_attempts = 0
+        while status != ActionStatus.success and num_attempts < 10:
+            print(f"Failed to pick up target object {object_id}. Trying again...")
+            self.move_by(-0.5)
+            self.turn_by(15 * direction)
+            # Alternate the direction.
+            direction *= -1
+            # Try to go to the object again.
+            status = self.move_to(target=object_id)
+            num_attempts += 1
         if status != ActionStatus.success:
             print(f"Failed to move to target object {object_id}: {status}")
             return False
         print(f"Moved to target object {object_id}")
-        self.pick_up(target=object_id, arm=Arm.left)
+        status = self.pick_up(target=object_id, arm=Arm.left)
         if object_id not in self.state.held[Arm.left]:
             print(f"Failed to pick up target object {object_id}: {status}")
             return False
@@ -122,20 +133,16 @@ if __name__ == "__main__":
 
     m.pick_up_container()
 
-    num_in_container = 0
     # Transport objects to the goal position.
     for target_object in m.target_objects[:3]:
         in_container = m.put_object_in_container(object_id=target_object)
-        if in_container:
-            # Record the object as being in the container.
-            num_in_container += 1
+
     # If the container is mostly full, bring it to the goal position and pour it out.
-    if num_in_container == 3:
-        print("Bringing target objects to the goal zone.")
-        m.move_to(target=TDWUtils.array_to_vector3(m.goal_position))
-        m.pour_out()
-        print("Poured out objects.")
-        num_in_container = 0
+    print("Bringing target objects to the goal zone.")
+    m.move_to(target=TDWUtils.array_to_vector3(m.goal_position))
+    m.pour_out()
+    print("Poured out objects.")
+    num_in_container = 0
 
     # Not all of the objects that were in the container are in the goal zone.
     # They might have bounced or rolled away.
