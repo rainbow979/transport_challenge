@@ -4,7 +4,7 @@ from typing import List, Dict, Tuple, Optional, Union
 import numpy as np
 from tdw.py_impact import ObjectInfo, AudioMaterial
 from tdw.librarian import ModelLibrarian
-from tdw.tdw_utils import TDWUtils, QuaternionUtils
+from tdw.tdw_utils import TDWUtils
 from magnebot import Magnebot, Arm, ActionStatus, ArmJoint
 from magnebot.scene_state import SceneState
 from magnebot.paths import ROOM_MAPS_DIRECTORY, OCCUPANCY_MAPS_DIRECTORY, SCENE_BOUNDS_PATH, SPAWN_POSITIONS_PATH
@@ -324,7 +324,6 @@ class Transport(Magnebot):
         self._next_frame_commands.append({"$type": "set_revolute_target",
                                           "joint_id": elbow_id,
                                           "target": 115})
-        self._do_arm_motion()
         state = SceneState(resp=self.communicate([]))
         # Bring the container approximately to center.
         ct = {"x": 0.1 * (-1 if container_arm is Arm.right else 1), "y": 0.4, "z": 0.5}
@@ -334,7 +333,8 @@ class Transport(Magnebot):
         self._do_arm_motion()
         state = SceneState(resp=self.communicate([]))
         # Move the target object to be over the container.
-        target = state.object_transforms[container_id].position + (QuaternionUtils.get_up_direction(state.object_transforms[container_id].rotation) * 0.3)
+        target = np.copy(state.object_transforms[container_id].position)
+        target[1] += 0.4
         self._start_ik(target=TDWUtils.array_to_vector3(target), arm=object_arm, allow_column=False, state=state,
                        absolute=True, fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER, object_id=object_id)
         # Get the ID of the wrist.
