@@ -92,7 +92,7 @@ Possible [return values](https://github.com/alters-mit/magnebot/blob/main/doc/ac
 
 - `success`
 - `cannot_reach`
-- `failed_to_grasp` (Either because the motion failed or because the magnet is already holding an object.)
+- `failed_to_grasp` (Either because the motion failed or because the magnet is already holding a different object.)
 - `failed_to_bend`
 
 

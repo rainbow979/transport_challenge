@@ -8,6 +8,7 @@ setup(
     long_description='Transport Challenge API. Extends the Magnebot API and the TDW API.',
     url='https://github.com/alters-mit/transport_challenge',
     author='Seth Alter',
+    author_email="alters@mit.edu",
     license='MIT',
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -20,5 +21,5 @@ setup(
     ],
     keywords='unity simulation tdw magnebot',
     packages=find_packages(),
-    install_requires=['magnebot', 'numpy', 'tdw'],
+    install_requires=['magnebot>=0.4.0', 'numpy', 'tdw>=1.8.0.0']
 )

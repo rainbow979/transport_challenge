@@ -399,6 +399,8 @@ class Transport(Magnebot):
         # Get all of the objects currently in the container.
         in_container_0 = self._get_objects_in_container(container_id=container_id)
         self._start_action()
+        self._next_frame_commands.append({"$type": "set_immovable",
+                                          "immovable": True})
 
         # Get the joint IDs.
         if container_arm == Arm.right:

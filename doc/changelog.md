@@ -1,8 +1,29 @@
 # Changelog
 
+## 0.1.3
+
+### `Transport`
+
+- Added optional parameter `skip_frames` (required in Magnebot 0.4.0)
+- Improved the speed of `put_in()`.
+- Fixed: `pick_up()` doesn't reset the arm if the magnet fails to grasp the target object.
+- Fixed: `pick_up()` often misses the object (it now aims for positions on the top of the object).
+- Fixed: `put_in()` sometimes doesn't stop the Magnebot's wheels from turning.
+- Fixed: `put_in()` often aims for the wrong target position above the container.
+- Fixed: `pour_out()` sometimes doesn't stop the Magnebot's wheels from turning.
+- Fixed: while objects are being dropped into a container during `put_in()`, they sometimes glitch (now they use the `discrete` collision detection mode).
+
+### Example controllers
+
+- Fixed: `single_room.py` doesn't work. Added simple navigation to make multiple attempts to pick up the target object.
+
+### Test controllers
+
+- Removed: `level.py`
+
 ## 0.1.2
 
-### `Transport` class
+### `Transport` 
 
 - Set `launch_build` default value to False (was True)
 - Fixed: `put_in()` often thinks that an object isn't in a container when it actually is.
@@ -13,7 +34,7 @@
 
 ## 0.1.1
 
-### `Transport` class
+### `Transport` 
 
 - Added optional parameter `img_is_png` to the constructor
 - Renamed `num_actions` to `action_cost`
