@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4
+
+### `Transport`
+
+- `put_in()` will immediately stop moving the arm holding the object if the magnet or the object is within the container.
+- Fixed: `put_in()` is too slow because the arm holding the object isn't sufficiently above the container.
+
 ## 0.1.3
 
 ### `Transport`

@@ -295,6 +295,20 @@ class Transport(Magnebot):
         :return: An `ActionStatus` indicating if the target object is in the container and if not, why.
         """
 
+        def __object_in_container(s: SceneState) -> bool:
+            """
+            :param s: The scene state.
+
+            :return: True if the target object is on the surface of the container or collides with an object in the container.
+            """
+
+            # The ID of the target object is actually the ID of the magnet because it's attached to the magnet.
+            magnet_id = self.magnebot_static.magnets[object_arm]
+
+            # Is the target object colliding with the surface of the container?
+            return container_id in self._trigger_events and (magnet_id in self._trigger_events[container_id] or
+                                                             object_id in self._trigger_events[container_id])
+
         # Get the arm holding each object.
         container_arm, container_id = self._get_container_arm()
         if container_arm is None:
@@ -334,7 +348,7 @@ class Transport(Magnebot):
         state = SceneState(resp=self.communicate([]))
         # Move the target object to be over the container.
         target = np.copy(state.object_transforms[container_id].position)
-        target[1] += 0.4
+        target[1] += 0.5
         self._start_ik(target=TDWUtils.array_to_vector3(target), arm=object_arm, allow_column=False, state=state,
                        absolute=True, fixed_torso_prismatic=Transport.__TORSO_PRISMATIC_CONTAINER, object_id=object_id)
         # Get the ID of the wrist.
@@ -346,7 +360,7 @@ class Transport(Magnebot):
         self._next_frame_commands.extend([{"$type": "set_spherical_target",
                                            "joint_id": wrist_id,
                                            "target": {"x": -45, "y": 0, "z": 0}}])
-        self._do_arm_motion()
+        self._do_arm_motion(conditional=__object_in_container)
         # Drop the object.
         self._append_drop_commands(object_id=object_id, arm=object_arm)
         # Set the detection mode to discrete. This will make physics less buggy.
@@ -595,12 +609,16 @@ class Transport(Magnebot):
         self._object_init_commands[object_id].append({"$type": "set_mass",
                                                       "id": object_id,
                                                       "mass": Transport.__CONTAINER_MASS})
-        self._object_init_commands[object_id].append({"$type": "add_trigger_collider",
-                                                      "id": object_id,
-                                                      "shape": "cube",
-                                                      "enter": True,
-                                                      "stay": True,
-                                                      "exit": False})
+        # Add a trigger collider inside the container.
+        # We'll use this trigger collider to determine if an object is in the container..
+        self._object_init_commands[object_id].extend([{"$type": "add_trigger_collider",
+                                                       "id": object_id,
+                                                       "shape": "cube",
+                                                       "enter": True,
+                                                       "stay": True,
+                                                       "exit": False,
+                                                       "position": {"x": 0, "y": 0.1525, "z": 0},
+                                                       "scale": {"x": 0.457, "y": 0.305, "z": 0.457}}])
         return object_id
 
     def _add_target_object(self, model_name: str, position: Dict[str, float]) -> int:
