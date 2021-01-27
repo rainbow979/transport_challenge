@@ -5,6 +5,7 @@
 ### `Transport`
 
 - `put_in()` will immediately stop moving the arm holding the object if the magnet or the object is within the container.
+- Improved the speed of `put_in()` and `pour_out()`.
 - Fixed: `put_in()` is too slow because the arm holding the object isn't sufficiently above the container.
 
 ## 0.1.3

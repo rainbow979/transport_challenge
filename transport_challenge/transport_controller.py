@@ -267,7 +267,7 @@ class Transport(Magnebot):
                 self._next_frame_commands = temp
                 self._start_action()
                 # Bend the arm.
-                self._do_arm_motion()
+                self._do_arm_motion(joint_ids=[wrist_id])
                 self._end_action()
 
                 # Cache the arm angles so we can next time immediately reset to this position.
@@ -360,7 +360,7 @@ class Transport(Magnebot):
         self._next_frame_commands.extend([{"$type": "set_spherical_target",
                                            "joint_id": wrist_id,
                                            "target": {"x": -45, "y": 0, "z": 0}}])
-        self._do_arm_motion(conditional=__object_in_container)
+        self._do_arm_motion(conditional=__object_in_container, joint_ids=[wrist_id])
         # Drop the object.
         self._append_drop_commands(object_id=object_id, arm=object_arm)
         # Set the detection mode to discrete. This will make physics less buggy.
@@ -433,15 +433,15 @@ class Transport(Magnebot):
                                           {"$type": "set_revolute_target",
                                            "joint_id": elbow_id,
                                            "target": 0}])
-        self._do_arm_motion()
-        # Flip the wrist.
+        self._do_arm_motion(joint_ids=[shoulder_id, elbow_id])
+        # Flip the wrist and elbow.
         self._next_frame_commands.extend([{"$type": "set_spherical_target",
                                            "joint_id": wrist_id,
                                            "target": {"x": 90, "y": 0, "z": 0}},
                                           {"$type": "set_revolute_target",
                                            "joint_id": elbow_id,
                                            "target": 35}])
-        self._do_arm_motion()
+        self._do_arm_motion(joint_ids=[wrist_id, elbow_id])
         # Wait for the objects to fall out (by this point, they likely already have).
         self._wait_until_objects_stop(in_container_0, state=SceneState(self.communicate([])))
         self._next_frame_commands.extend(self._get_reset_arm_commands(arm=container_arm, reset_torso=False))
