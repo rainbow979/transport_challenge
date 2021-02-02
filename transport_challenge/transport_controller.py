@@ -89,7 +89,7 @@ class Transport(Magnebot):
 
     def __init__(self, port: int = 1071, launch_build: bool = False, screen_width: int = 256, screen_height: int = 256,
                  debug: bool = False, auto_save_images: bool = False, images_directory: str = "images",
-                 random_seed: int = None, img_is_png: bool = True, skip_frames: int = 20):
+                 random_seed: int = None, img_is_png: bool = True, skip_frames: int = 10):
         """
         :param port: The socket port. [Read this](https://github.com/threedworld-mit/tdw/blob/master/Documentation/getting_started.md#command-line-arguments) for more information.
         :param launch_build: If True, the build will launch automatically on the default port (1071). If False, you will need to launch the build yourself (for example, from a Docker container).

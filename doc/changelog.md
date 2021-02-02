@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.5
+
+### `Transport`
+
+- Default value of `skip_frames` is 10 (was 20)
+
 ## 0.1.4
 
 ### `Transport`
