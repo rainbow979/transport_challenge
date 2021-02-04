@@ -1,10 +1,16 @@
 # Changelog
 
+## 0.1.6
+
 ## 0.1.5
 
 ### `Transport`
 
 - Default value of `skip_frames` is 10 (was 20)
+
+### Promo controllers
+
+- Renamed `controllers/demo/demo.py` to `controllers/promos/promo.py`
 
 ## 0.1.4
 
