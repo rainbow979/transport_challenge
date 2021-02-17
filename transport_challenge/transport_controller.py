@@ -8,7 +8,6 @@ from tdw.tdw_utils import TDWUtils
 from magnebot import Magnebot, Arm, ActionStatus, ArmJoint
 from magnebot.scene_state import SceneState
 from magnebot.paths import ROOM_MAPS_DIRECTORY, OCCUPANCY_MAPS_DIRECTORY, SCENE_BOUNDS_PATH, SPAWN_POSITIONS_PATH
-from magnebot.util import check_version
 from transport_challenge.paths import TARGET_OBJECT_MATERIALS_PATH, TARGET_OBJECTS_PATH, CONTAINERS_PATH
 
 
@@ -106,7 +105,6 @@ class Transport(Magnebot):
         super().__init__(port=port, launch_build=launch_build, screen_width=screen_width, screen_height=screen_height,
                          debug=debug, auto_save_images=auto_save_images, images_directory=images_directory,
                          random_seed=random_seed, img_is_png=img_is_png, skip_frames=skip_frames)
-        check_version(module="transport_challenge")
         """:field
         The IDs of each target object in the scene.
         """

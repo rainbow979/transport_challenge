@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='transport_challenge',
-    version="0.1.5.0",
+    version="0.1.6",
     description='Transport Challenge API. Extends the Magnebot API and the TDW API.',
     long_description='Transport Challenge API. Extends the Magnebot API and the TDW API.',
     url='https://github.com/alters-mit/transport_challenge',

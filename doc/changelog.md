@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.6
+
+### `Transport`
+
+- Fixed: JSONDecodeError because version check doesn't work (version check for this module has been removed)
+
 ## 0.1.5
 
 - Added license
