@@ -745,3 +745,9 @@ class Transport(Magnebot):
             sides = sides[:-2]
 
         return sides, resp
+        
+    def _get_scene_init_commands(self, magnebot_position: Dict[str, float] = None) -> List[dict]:
+        commands = super()._get_scene_init_commands(magnebot_position=magnebot_position)
+        commands.append({"$type": "set_field_of_view",
+                         "field_of_view": 90})
+        return commands
