@@ -1,0 +1,5 @@
+.idea/
+*/__pycache__/
+fbx/
+transport_challenge.egg-info/
+controllers/examples/images/
